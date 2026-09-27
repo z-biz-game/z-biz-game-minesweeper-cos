@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0F0F0F">
+<meta name="description" content="扫雷 MINESWEEPER —— 每一局都保证可以用纯逻辑推到底，永不靠猜。生成器实测零猜测，难度分由求解器量出。">
+<title>扫雷 · Minesweeper</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 5'%3E%3Crect width='5' height='5' fill='%230F0F0F'/%3E%3Ccircle cx='2.5' cy='2.8' r='1.5' fill='%23FFC048'/%3E%3Cg stroke='%23FFC048' stroke-width='0.5'%3E%3Cpath d='M2.5 0.4v0.9M0.6 2.8h0.9M3.5 2.8h0.9M2.5 4.6v0.4'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="./css/game.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================ 首页 ============================ -->
+  <section class="screen" id="screen-menu" data-screen="menu">
+    <header class="brand">
+      <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div>
+        <h1>扫雷</h1>
+        <p class="brand-sub">MINESWEEPER · 逻辑排雷</p>
+      </div>
+    </header>
+
+    <p class="lede">
+      数字是<b>周围八格里埋了几颗雷</b>。把它推干净，雷就自己现形 ——
+      这里的每一局都在出题时用求解器跑过，<b>只用铅笔逻辑就能推到底</b>，不存在五五开的猜。
+    </p>
+
+    <div class="tier-grid" id="tier-grid"></div>
+
+    <div class="card daily-card" id="daily-card">
+      <div class="daily-info">
+        <span class="chip chip-accent">每日一雷区</span>
+        <strong id="daily-key">—</strong>
+        <p id="daily-note">全服同一张图，按日期种子生成。</p>
+      </div>
+      <button class="btn btn-primary" id="btn-daily">开始</button>
+    </div>
+
+    <div class="card resume-card" id="resume-card" hidden>
+      <div class="resume-info">
+        <span class="chip" id="resume-tier">—</span>
+        <p id="resume-name">—</p>
+      </div>
+      <button class="btn" id="btn-resume">继续</button>
+      <button class="btn btn-ghost" id="btn-resume-drop" title="放弃这局">×</button>
+    </div>
+
+    <div class="card stats-card">
+      <div class="stat"><b id="st-solved">0</b><span>完成</span></div>
+      <div class="stat"><b id="st-streak">0</b><span>连续日</span></div>
+      <div class="stat"><b id="st-time">0:00</b><span>累计用时</span></div>
+      <div class="stat"><b id="st-hints">0</b><span>求助</span></div>
+    </div>
+
+    <div class="settings">
+      <label class="switch"><input type="checkbox" id="opt-sound"><span>音效</span></label>
+      <label class="switch"><input type="checkbox" id="opt-autoflag"><span>线索推满自动插旗</span></label>
+      <label class="switch"><input type="checkbox" id="opt-question"><span>允许问号格</span></label>
+      <label class="switch"><input type="checkbox" id="opt-motion"><span>减弱动效</span></label>
+      <button class="btn btn-ghost btn-sm" id="btn-help">怎么玩</button>
+      <button class="btn btn-ghost btn-sm" id="btn-reset">清空记录</button>
+    </div>
+  </section>
+
+  <!-- ============================ 对局 ============================ -->
+  <section class="screen" id="screen-game" data-screen="game" hidden>
+    <header class="hud">
+      <button class="icon-btn" id="btn-back" aria-label="返回">‹</button>
+      <div class="hud-title">
+        <strong id="hud-name">—</strong>
+        <span id="hud-tier" class="muted">—</span>
+      </div>
+      <div class="hud-metrics">
+        <span class="metric metric-mines" id="hud-mines"><b>0</b>雷</span>
+        <span class="metric metric-time" id="hud-time">0:00</span>
+      </div>
+    </header>
+
+    <div class="progress-rail"><i id="progress-fill"></i></div>
+
+    <div class="board-wrap" id="board-wrap">
+      <canvas id="board" aria-label="扫雷棋盘"></canvas>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="操作模式">
+        <button class="seg-btn is-on" data-mode="dig">挖开</button>
+        <button class="seg-btn" data-mode="flag">插旗</button>
+      </div>
+      <div class="tool-actions">
+        <button class="icon-btn" id="btn-undo" aria-label="撤销">↺</button>
+        <button class="icon-btn" id="btn-redo" aria-label="重做">↻</button>
+        <button class="btn btn-ghost btn-sm" id="btn-hint">求助 <b id="hint-count">0</b></button>
+        <button class="btn btn-ghost btn-sm" id="btn-restart">重开</button>
+      </div>
+    </div>
+
+    <div class="statusline" id="statusline" role="status" aria-live="polite"></div>
+  </section>
+
+  <!-- ============================ 结算 ============================ -->
+  <section class="screen screen-center" id="screen-win" data-screen="win" hidden>
+    <div class="win-card">
+      <span class="chip chip-accent" id="win-tag">完成</span>
+      <h2 id="win-name">—</h2>
+      <p class="muted" id="win-style">—</p>
+      <div class="win-grid">
+        <div><b id="win-time">—</b><span>用时</span></div>
+        <div><b id="win-moves">—</b><span>操作</span></div>
+        <div><b id="win-hints">—</b><span>求助</span></div>
+        <div><b id="win-score">—</b><span>难度分</span></div>
+      </div>
+      <p class="win-note" id="win-note">—</p>
+      <p class="win-proof">
+        这局的雷区在发到你手上之前，已被同一个求解器从首次点击推到<b>安全格全部翻开</b>，
+        用了 <b id="win-passes">—</b> 轮推理。所以踩到雷不存在"运气不好"，只有某一步没推完。
+      </p>
+      <div class="win-actions">
+        <button class="btn btn-primary" id="btn-next">下一局</button>
+        <button class="btn" id="btn-again">重玩本局</button>
+        <button class="btn btn-ghost" id="btn-home">收工</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 规则 ============================ -->
+  <div class="sheet" id="help-sheet" hidden>
+    <div class="sheet-card">
+      <h3>怎么玩</h3>
+      <ol class="rules">
+        <li><b>数字是雷数</b>：一个 <code>3</code> 说的是它周围八格里正好埋着 3 颗雷，不多不少。</li>
+        <li><b>挖开 / 插旗</b>：插旗是"这里一定是雷"。旗不够时不能开花，多点的那颗也不会替你背锅。插了旗的格不能直接挖开 —— 先拔掉它。</li>
+        <li><b>开花</b>：挖到 <code>0</code> 会自动推开一整片 —— 一次点击换一大片视野，这是扫雷的呼吸。</li>
+        <li><b>和弦</b>：一个数字周围的旗已经插满，再点它就是"剩下的格全安全"，一次推开全部。旗插多了会拒绝，不会偷偷帮你踩雷。</li>
+        <li><b>首次点击必安全</b>：亮起来的那一格是种子事先选好的，它和它周围八格都不放雷 —— 开局一定开花。换别的格当第一下不作数。</li>
+        <li><b>怎么推</b>：先看"线索已满足"（周围旗数=数字，剩下的格安全）和"剩余格必须全是雷"（未知格数=数字）；推不动时把两个数字<b>相减</b>，重叠部分的差就是答案；最后才数全局雷数总账。</li>
+        <li><b>求助</b>：跑一遍和出题时同一个求解器，给你一步<b>可证明</b>的推进，并说明用的是哪条规则。旗插错了它也会指出来。会记进成绩。</li>
+        <li><b>右键</b> 直接插旗；手机上<b>长按</b>插旗、<b>轻点</b>挖开，或者用下方的模式开关。<code>Shift</code> 或中键点一下清掉标记。<code>F</code> 切模式，<code>H</code> 求助，方向键移光标，<code>Enter</code> 落子，<code>Z</code> 撤销。</li>
+      </ol>
+      <button class="btn btn-primary" id="btn-help-close">知道了</button>
+    </div>
+  </div>
+
+  <div id="toast-host"></div>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>

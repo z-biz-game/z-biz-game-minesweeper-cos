@@ -1,0 +1,22 @@
+{
+  "name": "minesweeper",
+  "version": "1.0.0",
+  "description": "扫雷 Minesweeper — 零猜测逻辑排雷. 出题时由求解器实测：每一局都能只用铅笔推到底, 难度分与 3BV 都是量出来的.",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "dev": "node server.cjs 5173",
+    "electron": "electron .",
+    "test": "node tools/engine-test.mjs",
+    "balance": "node tools/balance.mjs",
+    "verify": "bash tools/verify.sh",
+    "check": "for f in js/*.js js/*/*.js; do node --check \"$f\" || exit 1; done && node --check server.cjs && node --check electron/main.cjs && echo OK"
+  },
+  "keywords": ["game", "puzzle", "minesweeper", "no-guess", "logic", "deduction", "procedural", "web", "electron"],
+  "author": "z-biz-game",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

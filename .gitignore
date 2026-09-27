@@ -1,0 +1,7 @@
+node_modules/
+dist/
+_site/
+.electron-cache/
+.DS_Store
+*.log
+tools/shots/
