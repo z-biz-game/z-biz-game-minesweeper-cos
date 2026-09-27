@@ -36,3 +36,41 @@ jobs:
 
       - name: Entry files exist
         run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html
+
+  # 真浏览器闸：headless Chrome + CDP，读 DOM 文本/几何与画布像素，不读内部标志位。
+  # 独立 job，node 22 而不是 check job 的 20：台架是裸 CDP 驱动，用的是 Node 22 才有的全局
+  # WebSocket/fetch；在 20 上第一次 attach 就死在 "WebSocket is not defined"，一条断言都跑不到。
+  browser:
+    name: real browser gate (both URL shapes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 194 项浏览器断言（7 个场景 engine gen play hint save resume layout）在两种 URL 形态下的条数逐条相同，是 2026-09-28 在本机实跑出来的，
+      # 不是引用。在这一步之前 CI 一步都没跑过 tools/verify.sh：闸是写了给人看的，不是给人跑的。
+      - name: Browser gate, root shape
+        env:
+          WD_TIMEOUT: 900
+        run: bash tools/verify.sh
+
+      # Pages 把这个仓发在 /z-biz-game-minesweeper-cos/ 之下，而根形态的服务方式分辨不出斜杠开头的 import——
+      # 同组织已经因此红过一次（部署站上 404，本地闸全绿）。所以前缀形态也是闸的一部分。
+      - name: Browser gate, prefix shape (how Pages serves us)
+        env:
+          WD_TIMEOUT: 900
+        run: |
+          root=$(mktemp -d)
+          ln -s "$GITHUB_WORKSPACE" "$root/z-biz-game-minesweeper-cos"
+          python3 -m http.server 5511 --bind 127.0.0.1 --directory "$root" &
+          SERVER=$!
+          trap 'kill $SERVER 2>/dev/null' EXIT
+          for i in $(seq 1 40); do
+            curl -fsS -m 2 "http://127.0.0.1:5511/z-biz-game-minesweeper-cos/" >/dev/null 2>&1 && break
+            sleep 0.25
+          done
+          curl -fsS -m 3 "http://127.0.0.1:5511/z-biz-game-minesweeper-cos/js/main.js" >/dev/null
+          curl -fsS -m 3 "http://127.0.0.1:5511/z-biz-game-minesweeper-cos/js/engine/field.js" >/dev/null
+          BASE_URL=http://127.0.0.1:5511/z-biz-game-minesweeper-cos/ bash tools/verify.sh
