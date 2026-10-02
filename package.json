@@ -8,10 +8,11 @@
     "start": "node server.cjs",
     "dev": "node server.cjs 5173",
     "electron": "electron .",
-    "test": "node tools/engine-test.mjs",
+    "test": "node tools/engine-test.mjs && node tools/pwa-test.mjs",
+    "test:pwa": "node tools/pwa-test.mjs",
     "balance": "node tools/balance.mjs",
     "verify": "bash tools/verify.sh",
-    "check": "for f in js/*.js js/*/*.js; do node --check \"$f\" || exit 1; done && node --check server.cjs && node --check electron/main.cjs && echo OK"
+    "check": "for f in js/*.js js/*/*.js; do node --check \"$f\" || exit 1; done && node --check server.cjs && node --check sw.js && node --check electron/main.cjs && echo OK"
   },
   "keywords": ["game", "puzzle", "minesweeper", "no-guess", "logic", "deduction", "procedural", "web", "electron"],
   "author": "z-biz-game",

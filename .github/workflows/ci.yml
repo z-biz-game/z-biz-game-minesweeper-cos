@@ -25,6 +25,9 @@ jobs:
         run: |
           for f in $(git ls-files 'js/*.js' 'js/*/*.js'); do node --check "$f" || exit 1; done
           node --check server.cjs
+          # sw.js 在仓根、不在上面两个 glob 里。它有语法错时浏览器只是"没装 ServiceWorker"，
+          # 不报错、不红，整站的离线能力静默失效——所以单独 check 一行。
+          node --check sw.js
           node --check electron/main.cjs
           node --check electron/preload.cjs
           for f in $(git ls-files 'tools/*.mjs'); do node --check "$f" || exit 1; done
@@ -33,6 +36,11 @@ jobs:
       # pencil logic. This is a plain Node test, so it guards merges without a browser.
       - name: Engine tests
         run: node tools/engine-test.mjs
+
+      # 可安装性的真值：manifest 每个图标在盘上且 IHDR 与 sizes 一致；sw 真的网络优先、
+      # 断网回落外壳、旧版本缓存被清；注册在 file:// 下不发生也不抛红。纯 node。
+      - name: PWA installability gate
+        run: node tools/pwa-test.mjs
 
       - name: Entry files exist
         run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html
