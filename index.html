@@ -93,6 +93,11 @@
         <span class="metric metric-mines" id="hud-mines"><b>0</b>雷</span>
         <span class="metric metric-time" id="hud-time">0:00</span>
       </div>
+      <div class="hud-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-pause" aria-pressed="false">暂停</button>
+        <button class="btn btn-ghost btn-sm" id="btn-sound" aria-pressed="true">音效</button>
+        <button class="btn btn-ghost btn-sm" id="btn-fullscreen" aria-label="全屏">全屏</button>
+      </div>
     </header>
 
     <div class="progress-rail"><i id="progress-fill"></i></div>
@@ -154,7 +159,8 @@
         <li><b>首次点击必安全</b>：亮起来的那一格是种子事先选好的，它和它周围八格都不放雷 —— 开局一定开花。换别的格当第一下不作数。</li>
         <li><b>怎么推</b>：先看"线索已满足"（周围旗数=数字，剩下的格安全）和"剩余格必须全是雷"（未知格数=数字）；推不动时把两个数字<b>相减</b>，重叠部分的差就是答案；最后才数全局雷数总账。</li>
         <li><b>求助</b>：跑一遍和出题时同一个求解器，给你一步<b>可证明</b>的推进，并说明用的是哪条规则。旗插错了它也会指出来。会记进成绩。</li>
-        <li><b>右键</b> 直接插旗；手机上<b>长按</b>插旗、<b>轻点</b>挖开，或者用下方的模式开关。<code>Shift</code> 或中键点一下清掉标记。<code>F</code> 切模式，<code>H</code> 求助，方向键移光标，<code>Enter</code> 落子，<code>Z</code> 撤销。</li>
+        <li><b>右键</b> 直接插旗；手机上<b>长按</b>插旗、<b>轻点</b>挖开，或者用下方的模式开关。<code>Shift</code> 或中键点一下清掉标记。</li>
+        <li><b>键盘</b>：方向键移光标，<code>Enter</code>/<code>空格</code> 落子，<code>F</code> 切挖开/插旗，<code>H</code> 求助，<code>Z</code>/<code>Y</code> 撤销重做，<code>R</code> 重开，<code>P</code> 暂停（计时与动画一起停住），<code>M</code> 静音，<code>Alt+Enter</code> 全屏，<code>?</code> 再看这张表，<code>Esc</code> 回菜单。</li>
       </ol>
       <button class="btn btn-primary" id="btn-help-close">知道了</button>
     </div>

@@ -12,6 +12,7 @@ import { OPEN, FLAG, HIDDEN, QUESTION } from './engine/field.js';
 import { nextHint } from './engine/solver.js';
 import { Game } from './ui/game.js';
 import { BoardView } from './render/board.js';
+import { createFrameClock } from './ui/loop.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (tag, cls, text) => {
@@ -52,6 +53,9 @@ const ui = {
   resumeCard: $('#resume-card'),
   resumeName: $('#resume-name'),
   resumeTier: $('#resume-tier'),
+  btnPause: $('#btn-pause'),
+  btnSound: $('#btn-sound'),
+  btnFull: $('#btn-fullscreen'),
 };
 
 let game = null;
@@ -62,6 +66,8 @@ let cursor = { x: 0, y: 0 };
 let needsDraw = true;
 let lastSecond = -1;
 let saveTimer = 0;
+// 帧长来自 createFrameClock，不来自"我以为屏幕是 60Hz"：动画进度必须是时间的函数。
+const frameClock = createFrameClock();
 let session = { tier: 'soldier', dailyKey: null };
 
 // The daily rotates over the whole ladder rather than picking one size, so a player who
@@ -259,17 +265,20 @@ function syncHud() {
 
 function loop(now) {
   requestAnimationFrame(loop);
+  const dt = frameClock.frame(now);
   if (ui.game.hidden || !game || !view) return;
+  // 暂停时连 FX 时钟都不喂：挖开的涟漪、胜负扫光会冻在原地，而不是玩家不在的时候偷偷跑完。
+  if (dt && !game.paused()) view.tick(dt);
   if (!game.over()) {
-    const secs = Math.floor(game.elapsed(now) / 1000);
+    const elapsed = game.elapsed(now);
+    const secs = Math.floor(elapsed / 1000);
     if (secs !== lastSecond) {
       lastSecond = secs;
-      ui.hudTime.textContent = fmtTime(game.elapsed(now));
+      ui.hudTime.textContent = fmtTime(elapsed);
     }
   }
-  const animating = view.animating(now);
-  if (needsDraw || animating) {
-    view.render(game, now);
+  if (needsDraw || view.animating()) {
+    view.render(game);
     needsDraw = false;
   }
 }
@@ -287,21 +296,22 @@ function resize() {
 // ---------------------------------------------------------------- events
 function wireGameEvents() {
   game.on((ev, g) => {
-    const now = performance.now();
+    // 不传时间戳：BoardView 的动画用它自己累加出来的 FX 时钟，混进 performance.now() 会把
+    // 两条时间轴搅在一起（同一个毫秒数在两个基准下含义完全不同）。
     switch (ev.type) {
       case 'open':
-        view.pulse(ev.cell, 'open', now);
+        view.pulse(ev.cell, 'open');
         audio.dig();
         haptic('tap');
         break;
       case 'flood':
-        for (const c of ev.cells.slice(0, 24)) view.pulse(c, 'open', now);
+        for (const c of ev.cells.slice(0, 24)) view.pulse(c, 'open');
         audio.flood(ev.cells.length);
         haptic('big');
         status(`一挖推开 <b>${ev.cells.length}</b> 格 —— 0 的意思是周围八格全空，所以整片都能翻开。`, 'good');
         break;
       case 'flag':
-        view.pulse(ev.cell, 'flag', now);
+        view.pulse(ev.cell, 'flag');
         audio.flag();
         haptic('tap');
         status(`插旗：<b>这一格是雷</b>。旗数会从上方的雷数里扣掉。`);
@@ -314,18 +324,18 @@ function wireGameEvents() {
         audio.unflag();
         break;
       case 'autoFlag':
-        for (const c of ev.cells) view.pulse(c, 'flag', now);
+        for (const c of ev.cells) view.pulse(c, 'flag');
         audio.flag();
         status(`有 <b>${ev.cells.length}</b> 格的线索已经推满，旗自动补上了。`, 'good');
         break;
       case 'chord':
         audio.chord();
-        for (const c of ev.cells) view.pulse(c, 'open', now);
+        for (const c of ev.cells) view.pulse(c, 'open');
         status(`和弦开花：数字周围的旗正好对上，剩下的 <b>${ev.cells.length}</b> 格一起翻开。`);
         break;
       case 'boom':
-        view.beginBoom(now);
-        view.pulse(ev.cell, 'boom', now);
+        view.beginBoom();
+        view.pulse(ev.cell, 'boom');
         audio.boom();
         haptic('bad');
         ui.boardWrap.classList.add('shake');
@@ -342,7 +352,7 @@ function wireGameEvents() {
         audio.hint();
         break;
       case 'win':
-        view.beginWin(now);
+        view.beginWin();
         audio.win();
         haptic('big');
         onWin();
@@ -463,6 +473,11 @@ ui.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 function actOn(cell, viaRight) {
   if (!game || game.over()) return;
+  // 暂停不是遮罩：面板还看得见，但点下去不落子——否则"暂停"只是自欺欺人。
+  if (game.paused()) {
+    status('暂停中 —— 先按「继续」（或 P）再挖。', 'bad');
+    return;
+  }
   const wantFlag = viaRight || mode === 'flag';
   const res = wantFlag ? game.flag(cell) : game.tap(cell, 'dig');
   if (!res.refused) game.clearHints();
@@ -543,9 +558,15 @@ window.addEventListener('keydown', (ev) => {
     $('#help-sheet').hidden = true;
     return;
   }
+  // ? 在任何一个界面都能开：规则表不是对局专属，站在菜单里问"怎么玩"同样是问题。
+  if (ev.key === '?') {
+    $('#help-sheet').hidden = false;
+    return;
+  }
   if (ui.game.hidden || !game) return;
   const p = game.puzzle;
   const k = ev.key.toLowerCase();
+  // 暂停时方向键仍可看盘（不改变任何事实），但会落子的键在 actOn 里被挡下。
   const move = (dx, dy) => {
     ev.preventDefault();
     cursor.x = Math.max(0, Math.min(p.w - 1, cursor.x + dx));
@@ -557,6 +578,8 @@ window.addEventListener('keydown', (ev) => {
   else if (k === 'arrowright') move(1, 0);
   else if (k === 'arrowup') move(0, -1);
   else if (k === 'arrowdown') move(0, 1);
+  // Alt+Enter 必须排在 Enter 前面判：否则它先落进"挖开这一格"，全屏永远轮不到。
+  else if (ev.key === 'Enter' && ev.altKey) { ev.preventDefault(); toggleFullscreen(); }
   else if (k === ' ' || k === 'enter') {
     ev.preventDefault();
     actOn(cursor.y * p.w + cursor.x, false);
@@ -564,10 +587,86 @@ window.addEventListener('keydown', (ev) => {
   else if (k === 'z') game.undo();
   else if (k === 'y') game.redo();
   else if (k === 'h') useHint();
+  else if (k === 'p') { ev.preventDefault(); togglePause(); }
+  // 静音与全屏不参与"这一格挖不挖"，所以暂停时也照样能按。
+  else if (k === 'm') toggleSound();
+  else if (k === 'r') { ev.preventDefault(); $('#btn-restart').click(); }
   else if (k === 'escape') {
     show('menu');
     renderMenu();
   }
+});
+
+// 静音：开关只有一处真值（Store.settings.sound），HUD 按钮与设置页复选框都走这里，
+// 否则会各存一份状态、点一下又互相打架。audio.setEnabled 里做的是挂起上下文。
+function setSound(v) {
+  const on = !!v;
+  Store.setSetting('sound', on);
+  audio.setEnabled(on);
+  syncSoundUi();
+  if (on) audio.hint();
+  return on;
+}
+
+function syncSoundUi() {
+  const on = !audio.muted;
+  if (ui.btnSound) {
+    ui.btnSound.textContent = on ? '音效' : '静音';
+    ui.btnSound.setAttribute('aria-pressed', on ? 'false' : 'true');
+    ui.btnSound.classList.toggle('is-off', audio.muted);
+  }
+  const opt = $('#opt-sound');
+  if (opt) opt.checked = on;
+}
+
+// M / 按钮 / 设置页复选框三个入口，一个动作：翻转后把真值写回 Store。
+function toggleSound() {
+  audio.toggleMute();
+  return setSound(audio.isEnabled());
+}
+
+// 暂停：表针与 FX 时钟一起停（见 game.elapsed 与 loop 里的 !game.paused()），
+// 而且玩家手不会替他把这一步走下去。
+function setPaused(v) {
+  if (!game) return false;
+  if (v) {
+    if (game.over()) return false;
+    game.pause();
+  } else {
+    game.resume();
+  }
+  const on = !!game.paused();
+  if (ui.btnPause) {
+    ui.btnPause.textContent = on ? '继续' : '暂停';
+    ui.btnPause.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  ui.game.classList.toggle('is-paused', on);
+  status(on ? '已暂停 —— 计时与动画都停在这里，等你回来。' : '继续。推完的那一步不会因为你回来而变。', on ? '' : 'good');
+  needsDraw = true;
+  return on;
+}
+const togglePause = () => setPaused(!game.paused());
+
+// 全屏：绑在 #app 上（这个 id 在 index.html 里真实存在），并且承认"浏览器可以拒绝"。
+function toggleFullscreen() {
+  const host = $('#app') || document.documentElement;
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) Promise.resolve(exit.call(document)).catch(() => toast('系统不允许退出全屏', 'bad'));
+    return false;
+  }
+  const req = host.requestFullscreen || host.webkitRequestFullscreen;
+  if (!req) {
+    toast('这台设备没有可用的全屏接口', 'bad');
+    return false;
+  }
+  Promise.resolve(req.call(host))
+    .then(() => true)
+    .catch(() => { toast('全屏被拒绝了（通常是系统或浏览器策略）', 'bad'); return false; });
+  return true;
+}
+document.addEventListener('fullscreenchange', () => {
+  if (ui.btnFull) ui.btnFull.classList.toggle('is-on', !!document.fullscreenElement);
 });
 
 function setMode(m) {
@@ -599,6 +698,8 @@ $('#btn-restart').addEventListener('click', () => {
   if (!game) return;
   const p = game.puzzle;
   game.reset();
+  // reset() 只复位规则态；上一局的涟漪与胜负扫光留在 BoardView 里，不清就盖在新雷区上。
+  if (view) view.resetFx();
   Store.clearResume();
   cursor = { x: p.start % p.w, y: (p.start / p.w) | 0 };
   game.start();
@@ -644,11 +745,7 @@ $('#btn-resume-drop').addEventListener('click', () => {
 });
 $('#btn-daily').addEventListener('click', () => startDaily());
 
-$('#opt-sound').addEventListener('change', (e) => {
-  Store.setSetting('sound', e.target.checked);
-  audio.setEnabled(e.target.checked);
-  if (e.target.checked) audio.hint();
-});
+$('#opt-sound').addEventListener('change', (e) => setSound(e.target.checked));
 $('#opt-autoflag').addEventListener('change', (e) => {
   Store.setSetting('autoFlag', e.target.checked);
   // Deliberately not retroactive: flags added now would either join an older undo entry or
@@ -660,6 +757,9 @@ $('#opt-motion').addEventListener('change', (e) => {
   Store.setSetting('reduceMotion', e.target.checked);
   setReduceMotion(e.target.checked);
 });
+$('#btn-pause').addEventListener('click', togglePause);
+$('#btn-sound').addEventListener('click', toggleSound);
+$('#btn-fullscreen').addEventListener('click', toggleFullscreen);
 $('#btn-help').addEventListener('click', () => ($('#help-sheet').hidden = false));
 $('#btn-help-close').addEventListener('click', () => ($('#help-sheet').hidden = true));
 $('#btn-reset').addEventListener('click', () => {
@@ -787,6 +887,20 @@ window.minesweeper = {
     needsDraw = true;
     return { steps, won: !!game.finishedAt, left: game.remaining() };
   },
+  // 时间轴读数：任何外部探针都能自己复测"动画是不是帧率的函数"，不必信本仓的一面之词。
+  fx() {
+    return {
+      clockMs: view ? Math.round(view.clock * 1000) / 1000 : 0,
+      frameMs: Math.round(frameClock.elapsed * 1000) / 1000,
+      pulses: view ? view.pulses.size : 0,
+      paused: !!game && game.paused(),
+    };
+  },
+  tick: (dt) => view && view.tick(dt),
+  pause: (v) => setPaused(v === undefined ? !game.paused() : !!v),
+  sound: (v) => (v === undefined ? audio.isEnabled() : setSound(v)),
+  toggleSound,
+  fullscreen: toggleFullscreen,
   undo: () => game && game.undo(),
   redo: () => game && game.redo(),
   reset: () => game && game.reset(),
@@ -814,7 +928,7 @@ window.minesweeper = {
 applyThemeVars();
 setReduceMotion(Store.setting('reduceMotion'));
 audio.setEnabled(Store.setting('sound'));
-$('#opt-sound').checked = !!Store.setting('sound');
+syncSoundUi();
 $('#opt-autoflag').checked = Store.setting('autoFlag') !== false;
 $('#opt-question').checked = !!Store.setting('question');
 $('#opt-motion').checked = !!Store.setting('reduceMotion');

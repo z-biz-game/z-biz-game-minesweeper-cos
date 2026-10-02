@@ -17,21 +17,52 @@ function ensure() {
   return ctx;
 }
 
+// 静音必须是"图元不再生成 + 上下文挂起"，不是把 master 增益拧到 0：
+// gain=0 时每个音效仍会 createOscillator/start/stop，一局几百个节点白烧，
+// 而且已经排进时间线的长音（win 的 5 连音、boom 的 0.6s）仍会占着调度器。
+function applyCtxState() {
+  if (!ctx) return;
+  const suspend = typeof ctx.suspend === 'function';
+  const resume = typeof ctx.resume === 'function';
+  try {
+    if (!enabled) {
+      if (suspend && ctx.state === 'running') ctx.suspend();
+    } else if (resume && ctx.state === 'suspended') {
+      ctx.resume();
+    }
+  } catch (e) {
+    // 旧 Safari / headless 桩没有 suspend()：没有它静音仍然成立（tone() 直接不生成节点），
+    // 只是省不掉调度器。这不该把整局游戏带崩。
+  }
+}
+
 export const audio = {
   setEnabled(v) {
     enabled = !!v;
     if (master) master.gain.value = enabled ? 0.32 : 0;
+    applyCtxState();
   },
   isEnabled: () => enabled,
+  // 两种叫法都留着是有原因的：设置项历史上叫 sound（存的是"开不开"），而玩家看到的
+  // 按钮与快捷键 M 说的是"静不静"。让两侧各有自己的读法，就不用在调用处写双重否定。
+  get muted() {
+    return !enabled;
+  },
+  toggleMute() {
+    this.setEnabled(!enabled);
+    return !enabled;
+  },
   // Browsers refuse to start audio outside a gesture; the first tap calls this.
   unlock() {
     const c = ensure();
-    if (c && c.state === 'suspended') c.resume();
+    // 静音时不许偷偷把上下文唤醒——那等于玩家按了静音、下一次点击又把它打开了。
+    if (c && enabled && c.state === 'suspended') c.resume();
   },
 
   tone({ freq = 440, dur = 0.08, type = 'sine', gain = 0.5, slide = 0, delay = 0 }) {
+    if (!enabled) return;              // 静音下不生成任何节点，先看开关再建上下文
     const c = ensure();
-    if (!c || !enabled) return;
+    if (!c) return;
     const t0 = c.currentTime + delay;
     const osc = c.createOscillator();
     const g = c.createGain();

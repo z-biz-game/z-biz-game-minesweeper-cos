@@ -50,6 +50,23 @@ export class BoardView {
     this.h = 0;
     this.winAt = 0;
     this.boomAt = 0;
+    // 动画时间轴是"累加出来的帧长"，不是 performance.now()：30/60/120Hz 下同一刻的进度
+    // 必须一致，而且暂停时不再喂帧，FX 就自然冻住（用墙钟的话暂停 3 分钟回来动画会瞬完）。
+    this.clock = 0;
+  }
+
+  // 每帧喂一次真实帧长（由 main.js 的帧时钟算出，含后台标签页钳制）。
+  tick(dtMs) {
+    this.clock += dtMs;
+  }
+
+  // 重开必须把 FX 一起清零：留着上一局的脉冲/胜负动画，新局会带着旧雷的残影开场。
+  resetFx() {
+    this.pulses.clear();
+    this.winAt = 0;
+    this.boomAt = 0;
+    this.clock = 0;
+    this._grain = null;
   }
 
   layout(field, availW, availH) {
@@ -89,25 +106,25 @@ export class BoardView {
     return { cell: y * this.w + x, x, y };
   }
 
-  pulse(cell, kind, now) {
-    if (!prefersReducedMotion()) this.pulses.set(cell, { kind, at: now });
+  pulse(cell, kind, at = this.clock) {
+    if (!prefersReducedMotion()) this.pulses.set(cell, { kind, at });
   }
 
-  beginWin(now) {
-    this.winAt = now;
+  beginWin(at = this.clock) {
+    this.winAt = at;
   }
 
-  beginBoom(now) {
-    this.boomAt = now;
+  beginBoom(at = this.clock) {
+    this.boomAt = at;
   }
 
-  animating(now) {
+  animating(now = this.clock) {
     if (this.winAt || this.boomAt) return true;
     for (const v of this.pulses.values()) if (now - v.at < Motion.pop) return true;
     return false;
   }
 
-  render(game, now) {
+  render(game, now = this.clock) {
     const g = this.geo;
     if (!g) return;
     const { field, view, puzzle } = game;

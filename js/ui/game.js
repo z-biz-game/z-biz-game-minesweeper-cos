@@ -66,9 +66,16 @@ export class Game {
     this.pausedAt = 0;
   }
 
+  paused() {
+    return !!this.pausedAt;
+  }
+
+  // 暂停期间表针必须真的停：只累加 pausedTotal 而不扣"当前这段还没结束的暂停"，
+  // 暂停 3 分钟回来 HUD 会一次跳 3 分钟，最佳成绩也就成了个可刷的数字。
   elapsed(now = performance.now()) {
     if (!this.startedAt) return 0;
-    return Math.max(0, (this.finishedAt || this.deadAt || now) - this.startedAt - this.pausedTotal);
+    const stop = this.finishedAt || this.deadAt || (this.pausedAt || now);
+    return Math.max(0, stop - this.startedAt - this.pausedTotal);
   }
 
   over() {

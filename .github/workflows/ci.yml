@@ -42,6 +42,16 @@ jobs:
       - name: PWA installability gate
         run: node tools/pwa-test.mjs
 
+      # 三把"行为尺"，都不需要浏览器，全部自带负控（把实现改坏就会红）：
+      #   save  存档坏一条只丢那一条，坏记录不许炸启动
+      #   rate  同一局在 30/60/120Hz 画出同一帧，暂停时表针真的停
+      #   audio 静音是挂起上下文 + 零节点，不是 gain=0
+      - name: Save / frame-rate / audio behaviour gates
+        run: |
+          node tools/save-test.mjs
+          node tools/rate-test.mjs
+          node tools/audio-test.mjs
+
       - name: Entry files exist
         run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html
 
