@@ -12,6 +12,9 @@ const TYPES = {
   '.cjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  // Chrome 拿到 octet-stream 的 manifest 会直接拒绝安装（"Manifest fetch failed"），
+  // 而本地这条路径就是 server.cjs 在服 —— 少了这一行，PWA 在自己的服务器上装不上。
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',

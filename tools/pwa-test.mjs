@@ -241,5 +241,56 @@ const noSw = await (async () => {
 })();
 ok('浏览器没有 serviceWorker 时不崩', noSw === null, String(noSw));
 
+// ---------------------------------------------------------------- D. 自己的服务器要给出能被安装的 MIME
+{
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const { createServer } = require(path.join(ROOT, 'server.cjs'));
+  const server = createServer(ROOT);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const types = {
+    '/manifest.webmanifest': ['application/manifest+json', 'application/json'],
+    '/sw.js': ['text/javascript', 'application/javascript'],
+    '/index.html': ['text/html'],
+    '/assets/icons/icon-512.png': ['image/png'],
+  };
+  for (const [route, want] of Object.entries(types)) {
+    let res = null, err = null;
+    try { res = await fetch(base + route); } catch (e) { err = e.message; }
+    ok(`本地服务器 200: ${route}`, !!res && res.status === 200, err || (res && String(res.status)));
+    const ct = String(res && res.headers.get('content-type'));
+    // octet-stream 的 manifest 在 Chrome 眼里等于"没有 manifest"，安装提示根本不会出现。
+    ok(`MIME 可安装: ${route}`, want.some((w) => ct.startsWith(w)), ct);
+  }
+  const mfBody = await (await fetch(base + '/manifest.webmanifest')).text();
+  ok('服务器上的 manifest 与盘上同一份', JSON.parse(mfBody).start_url === mf.start_url);
+  const swBody = await (await fetch(base + '/sw.js')).text();
+  ok('服务器上的 sw.js 与盘上同一份', swBody === swSrc);
+  await new Promise((r) => server.close(r));
+
+  // 静态服务器的越界读取：把服务器根收窄到 assets/，再用四种写法去要仓根的 package.json。
+  // （fetch 会把 /../ 在 URL 层就规范化掉，所以字面 '..' 必须用 %2e%2e 或 %2f 才真打到服务器，
+  //   这条断言才有意义 —— 第一版就是栽在这里，测的是 URL 解析而不是服务器的守卫。）
+  const marker = '"name": "minesweeper"';
+  const nested = createServer(path.join(ROOT, 'assets'));
+  await new Promise((r) => nested.listen(0, '127.0.0.1', r));
+  const nbase = `http://127.0.0.1:${nested.address().port}`;
+  let leaked = [];
+  for (const probe of ['/../package.json', '/%2e%2e/package.json', '/..%2fpackage.json',
+    '/%2e%2e%2fpackage.json', '/icons/../../package.json', '/%2e%2e%2f%2e%2e%2fpackage.json']) {
+    let body = '', code = 'throw';
+    try {
+      const res = await fetch(nbase + probe);
+      code = String(res.status);
+      body = res.ok ? await res.text() : '';
+    } catch { /* 连接层失败也算没泄漏 */ }
+    if (body.includes(marker)) leaked.push(probe + '→' + code);
+    ok(`越界探针不返回仓根文件: ${probe}`, !body.includes(marker), code);
+  }
+  ok('收窄的根仍可正常取图', (await fetch(nbase + '/icons/icon-512.png')).status === 200);
+  await new Promise((r) => nested.close(r));
+}
+
 console.log(`\n${fail ? 'FAILED' : 'OK'}  pwa: ${pass} pass / ${fail} fail  (manifest ${ (mf.icons || []).length } icons, precache ${precache.length})`);
 process.exit(fail ? 1 : 0);
