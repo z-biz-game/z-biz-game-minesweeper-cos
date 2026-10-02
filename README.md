@@ -25,7 +25,8 @@ npm run electron     # 桌面壳（electron/main.cjs，同一份代码）
 
 ```bash
 npm run check        # 逐文件 node --check 语法门禁
-npm test             # 引擎断言 167 项：求解器可靠性 / 生成保证 / 规则 / 存档形状
+npm test             # 五把闸共 374 项断言，全部只要 node：引擎 167 / PWA 91 / 存档 60 / 帧率 40 / 静音 16
+                     # （每把都自带负控——把实现改坏，对应那条会红，不是只数文件里的字样）
 npm run balance      # 难度实测台：每档 3 000 候选的分数分位、入选率、求解代价
 npm run verify       # 无头 Chrome 跑 7 个浏览器场景（需本机 Chrome，见下）
 ```
@@ -63,6 +64,8 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 | 模式段控件 / `F` | 挖开 ⇄ 插旗 |
 | 方向键 | **只移动光标**，空格/回车才落子 |
 | `Z` / `Y` / `H` / `Esc` | 撤销 / 重做 / 求助 / 回首页（求助会记进成绩） |
+| `R` / `P` / `M` | 重开同一处雷区 / 暂停（计时与动画一起停住，暂停中点格子不落子）/ 静音（挂起 WebAudio 上下文，不是把音量拧小） |
+| `Alt+Enter` / `?` | 全屏（被系统拒绝会给一句 toast，不静默）/ 打开这张操作表 |
 | 线索推满 | 该数字剩余的未知格自动补旗（可在设置里关掉，关掉后**真的**由你自己插） |
 
 五档难度，全部由求解器实测分数定档（下表是 `npm run balance` 每档 3 000 候选的实测）：
