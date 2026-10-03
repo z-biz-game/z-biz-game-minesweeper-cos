@@ -644,10 +644,42 @@ $('#btn-resume-drop').addEventListener('click', () => {
 });
 $('#btn-daily').addEventListener('click', () => startDaily());
 
+// ---- 静音开关：HUD 按钮与设置勾选框共用一条路径 -----------------------------------------
+// 真静音在 js/audio/synth.js 里做（suspend AudioContext + 静音态不再新建振荡器节点），
+// 偏好由 synth 落盘到 localStorage；这里只负责把两个控件的状态对齐到同一份 Store。
+function applySound(on) {
+  const v = !!on;
+  Store.setSetting('sound', v);
+  audio.setEnabled(v);
+  const box = $('#opt-sound');
+  if (box && box.checked !== v) box.checked = v;
+  const btn = $('#btn-sound');
+  if (btn) {
+    btn.setAttribute('aria-pressed', String(v));
+    btn.textContent = v ? '♪' : '✕';
+    btn.setAttribute('aria-label', v ? '音效开关' : '音效已关');
+  }
+  return v;
+}
+
+window.addEventListener('keydown', (ev) => {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (ev.target && /^(input|textarea|select)$/i.test(ev.target.tagName || '')) return;
+  // M 在本仓未被占用，走房规键位。
+  if (ev.key === 'm' || ev.key === 'M') {
+    ev.preventDefault();
+    applySound(!audio.isEnabled());
+    if (audio.isEnabled()) audio.hint();
+  }
+});
+
+$('#btn-sound').addEventListener('click', () => {
+  applySound(!audio.isEnabled());
+  if (audio.isEnabled()) audio.hint();
+});
+
 $('#opt-sound').addEventListener('change', (e) => {
-  Store.setSetting('sound', e.target.checked);
-  audio.setEnabled(e.target.checked);
-  if (e.target.checked) audio.hint();
+  applySound(e.target.checked);
 });
 $('#opt-autoflag').addEventListener('change', (e) => {
   Store.setSetting('autoFlag', e.target.checked);
@@ -813,8 +845,7 @@ window.minesweeper = {
 // ---------------------------------------------------------------- boot
 applyThemeVars();
 setReduceMotion(Store.setting('reduceMotion'));
-audio.setEnabled(Store.setting('sound'));
-$('#opt-sound').checked = !!Store.setting('sound');
+applySound(Store.setting('sound') !== false);
 $('#opt-autoflag').checked = Store.setting('autoFlag') !== false;
 $('#opt-question').checked = !!Store.setting('question');
 $('#opt-motion').checked = !!Store.setting('reduceMotion');
