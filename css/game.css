@@ -102,9 +102,13 @@ h3 { font: 700 18px/1.4 var(--font-sans); margin: 0 0 var(--space-inner); }
 
 .settings { display: flex; flex-wrap: wrap; gap: var(--space-inner) var(--space-card); align-items: center; }
 .switch { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-dim); cursor: pointer; min-height: 32px; }
-.switch input { appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background var(--dur-tap) linear; margin: 0; }
-.switch input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink-dim); transition: transform var(--dur-tap) var(--ease-spring), background var(--dur-tap) linear; }
-.switch input:checked { background: var(--accent-soft); }
+/* 开关的可点盒是 44x44（指尖下限），图形照旧是那条 36x20 的槽：槽挪到 ::before、滑块挪到
+   ::after，两者都相对这颗 44 的盒子定位。390×844 实测原先的 input 只有 36x20——目标比拇指
+   还小，挨着的那条开关就是误触对象。 */
+.switch input { appearance: none; width: 44px; height: 44px; background: transparent; position: relative; cursor: pointer; margin: 0; flex: 0 0 auto; }
+.switch input::before { content: ''; position: absolute; left: 4px; top: 12px; width: 36px; height: 20px; border-radius: 999px; background: var(--line); transition: background var(--dur-tap) linear; }
+.switch input::after { content: ''; position: absolute; top: 14px; left: 6px; width: 16px; height: 16px; border-radius: 50%; background: var(--ink-dim); transition: transform var(--dur-tap) var(--ease-spring), background var(--dur-tap) linear; }
+.switch input:checked::before { background: var(--accent-soft); }
 .switch input:checked::after { transform: translateX(16px); background: var(--accent); }
 
 .btn {
@@ -117,7 +121,9 @@ h3 { font: 700 18px/1.4 var(--font-sans); margin: 0 0 var(--space-inner); }
 .btn:active { transform: scale(0.96); }
 .btn-primary { background: var(--accent); color: #1a1206; border-color: var(--accent); font-weight: 700; }
 .btn-ghost { background: transparent; border-color: var(--line); color: var(--ink-dim); }
-.btn-sm { min-height: 40px; padding: 0 12px; font-size: 13px; }
+/* 390×844 实测「怎么玩」65x40、「清空记录」78x40：.btn-sm 把 .btn 的 44px 下限悄悄降到 40。
+   4px 看着不多，但它是这一屏里成片的次要按钮，手机上按 44 的口径统一。 */
+.btn-sm { min-height: 44px; padding: 0 12px; font-size: 13px; }
 .btn[disabled] { opacity: 0.36; pointer-events: none; }
 
 .icon-btn {
@@ -171,9 +177,11 @@ canvas.grabbing { cursor: grabbing; }
 
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-inner); flex-wrap: wrap; margin-top: var(--space-inner); }
 .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-button); padding: 3px; gap: 3px; }
+/* 模式切换那一排（点题/插旗/擦除）开局藏在面板里，把隐藏层全部揭开才量得到：实测 50x38。
+   .seg 有 3px 的内衬，所以这一排的整框本来就比格子高 6px——格子回到 44，整框 50。 */
 .seg-btn {
   font: 600 13px/1 var(--font-sans); color: var(--ink-dim);
-  background: transparent; border: 0; border-radius: 9px; padding: 0 12px; min-height: 38px;
+  background: transparent; border: 0; border-radius: 9px; padding: 0 12px; min-height: 44px;
   cursor: pointer; transition: background var(--dur-tap) linear, color var(--dur-tap) linear;
 }
 .seg-btn.is-on { background: var(--accent-soft); color: var(--accent); }
