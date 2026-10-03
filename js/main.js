@@ -868,7 +868,11 @@ requestAnimationFrame(loop);
     || document.msFullscreenElement || null;
 
   // 不支持也要给个说法：只把按钮灰掉而不解释，玩家会以为这功能没做完。
+  // supported 这枚标记不能省：下面 sync() 每次都会重写 title，不挡住的话，装的时候刚写
+  // 进去的人话原因会被随后的 sync() 立刻抹成"全屏 (F)"——禁用就变成一句没有理由的禁用。
+  let supported = !!req;
   const unsupported = () => {
+    supported = false;
     btn.disabled = true;
     btn.title = '这个浏览器不提供元素全屏（iOS Safari 请用「添加到主屏幕」独立打开）';
   };
@@ -901,7 +905,7 @@ requestAnimationFrame(loop);
     // 图标按钮不换字形（换字形会把 HUD 的视觉语言换掉），改成把可读名与提示写回无障碍属性。
     const say = on ? "退出全屏" : "全屏";
     btn.setAttribute('aria-label', say);
-    btn.title = say + '（F）';
+    if (supported) btn.title = say + '（F）';
     const body = document.body;
     if (body && body.classList) body.classList.toggle('fullscreen', on);
   }
