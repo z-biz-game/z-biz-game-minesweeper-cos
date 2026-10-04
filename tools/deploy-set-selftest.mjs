@@ -95,17 +95,41 @@ const existing = (rel) => rel && fs.existsSync(path.join(base, rel));
 const oneCssInDir = (rel) => (fs.existsSync(path.join(base, rel))
   ? fs.readdirSync(path.join(base, rel)).filter((f) => f.endsWith('.css')).map((f) => rel + '/' + f)[0] : null);
 const cssFile = cssFromDump.find(existing) || oneCssInDir('css');
-const jsFile = (dump.find((d) => /\.js$/.test(d.target) && d.target === 'js/main.js' && real(d)) || {}).target ||
-  (fs.existsSync(path.join(base, 'js/main.js')) ? 'js/main.js' : null);
+// X10 的靶子必须是"闸真的会读的那支 JS"：出处表里作为 from 出现的 .js 就是被取径扫过的站。
+// 原来写死仓根那支入口名，等于拿某一个仓的形状当全站假设——tasquare 的入口住在 ui 子目录里，
+// 台架于是报「找不到可写注释的 JS 站」而红，红的其实是靶子没挑对，不是这一仓的闸不咬。
+const scannedJs = [...new Set(dump.filter((d) => /\.js$/.test(d.from) && existing(d.from)).map((d) => d.from))];
+const jsFile = (scannedJs.includes('js/main.js') ? 'js/main.js' : null) || scannedJs[0] ||
+  ((dump.find((d) => /\.js$/.test(d.target) && real(d) && existing(d.target)) || {}).target) || null;
 // R7 的两把刀要两枚靶子：页面上那句 og:image，和 README 里那份部署前缀声明（闸的 PAGES 就取它
 // 的第一次出现）。读法与闸逐字一致，否则台架打的是空气。
 const readOpt = (dir, rel) => (fs.existsSync(path.join(dir, rel)) ? fs.readFileSync(path.join(dir, rel), 'utf8') : '');
 const ogTag = (readOpt(base, 'index.html').match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || '';
 const pagesUrl = (readOpt(base, 'README.md').match(/https?:\/\/[A-Za-z0-9._-]+\.github\.io\/[A-Za-z0-9._-]+/) || [])[0] || '';
 
-line(`基线: rc=0 ${baseRun.tally} rows=${baseRun.rows} refs=${dump.length} 位图引用=${pngRefs.length}`);
+// 位图有两种住法：产物里的 .png 文件，和 manifest 里内联的 base64。pour / staircase 把自己的
+// 「仓里零二进制文件」写进了测试（.png 一律不许存在），它们的图标只能住在 data URI 里；台架原先
+// 只认前者，这两仓于是报「没解析到位图引用」——红的是台架的假设，不是这一仓的缺陷。收集口径与
+// 闸的 entries 一致（icons、screenshots、每条 shortcut 的 icons），否则刀打的是空气。
+const dataPng = (src) => /^data:image\/png;base64,([\s\S]+)$/i.exec(String(src).trim());
+const dataIcons = [];
+let mfBase = null;
+try { mfBase = JSON.parse(readOpt(base, 'manifest.webmanifest')); } catch { mfBase = null; }
+if (mfBase) {
+  for (const k of ['icons', 'screenshots']) {
+    for (const i of mfBase[k] || []) if (i.src && i.sizes && dataPng(i.src)) dataIcons.push({ from: 'manifest.' + k, src: String(i.src).trim(), sizes: String(i.sizes) });
+  }
+  (mfBase.shortcuts || []).forEach((s, n) => {
+    for (const i of s.icons || []) if (i.src && i.sizes && dataPng(i.src)) dataIcons.push({ from: `manifest.shortcuts[${n}].icons`, src: String(i.src).trim(), sizes: String(i.sizes) });
+  });
+}
+// X1 的刀口是"清单少收一类文件"。有位图目录时砍那个 for 循环；内联位图的仓根本没有位图目录，
+// 砍循环打在空处，就改砍无条件的那一行（css 不再进产物），R10 必须点名缺的那份 CSS。
+const cssRefInArtifact = dump.find((d) => real(d) && /\.css$/i.test(d.target) && existing(d.target));
+
+line(`基线: rc=0 ${baseRun.tally} rows=${baseRun.rows} refs=${dump.length} 位图引用=${pngRefs.length} 内联位图=${dataIcons.length}`);
 const gaps = [];
-if (!pngRefs.length) gaps.push('没解析到位图引用');
+if (!pngRefs.length && !dataIcons.length) gaps.push('既没有 .png 文件引用，也没有内联 data:image/png 图标（P 段没有可核对象）');
 if (!jsEdge) gaps.push('没解析到模块图的边');
 if (!cssFile) gaps.push('找不到可读的 CSS 站');
 if (!jsFile) gaps.push('找不到可写注释的 JS 站');
@@ -132,11 +156,21 @@ function knife(tag, want, mutate, note) {
 
 let bad = 0;
 
-// X1 清单落后于页面：assemble 不收位图目录。这一仓 55/59 走 icons/，2 个走 assets/，
-// 期望由靶子自己决定，所以两个目录名都在针里。
-if (!knife('X1 assemble 不收位图目录', ['R10', path.basename(pngRefs[0].target)], (dir) => {
-  edit(dir, 'tools/assemble-site.sh', 'for d in icons assets; do', 'for d in probe_missing_dir; do');
-})) bad += 1;
+// X1 清单落后于页面：assemble 少收一类文件，产物里没有它而页面会去要。
+// 有位图目录（这一仓 55/59 走 icons/，2 个走 assets/）就砍那个 for 循环，期望由靶子自己决定，
+// 两个目录名都在针里；内联位图的仓没有位图目录可砍，就砍无条件那行的 css。
+if (pngRefs.length) {
+  if (!knife('X1 assemble 不收位图目录', ['R10', path.basename(pngRefs[0].target)], (dir) => {
+    edit(dir, 'tools/assemble-site.sh', 'for d in icons assets; do', 'for d in probe_missing_dir; do');
+  })) bad += 1;
+} else {
+  if (!cssRefInArtifact) {
+    line('X1 INERT · 这一仓既没有位图目录可砍，index.html 也没引到一份在产物里的 CSS');
+    bad += 1;
+  } else if (!knife('X1 assemble 不收 css 目录', ['R10', path.basename(cssRefInArtifact.target)], (dir) => {
+    edit(dir, 'tools/assemble-site.sh', 'cp -r css js "$DEST/"', 'cp -r js "$DEST/"');
+  })) bad += 1;
+}
 
 // X2 模块图的一条边改名：浏览器 404 整个文件，而这一站之后没人扫过。
 const edgeBase = jsEdge.spec.replace(/^.*\//, '');
@@ -187,9 +221,31 @@ if (sizedRef) {
     hit.sizes = '256x256';
     putMf(dir, mf);
   }, (res) => '声明被改成 256x256')) bad += 1;
+} else if (dataIcons.length) {
+  line('X7 SKIP · 这一仓的位图都内联在 manifest 里（没有 .png 文件靶子），P 段由 X13 证');
 } else {
   line('X7 SKIP 没有一张带 sizes 且真在产物里的 PNG 靶子（闸的 P 段在这一仓无可核对象）');
   bad += 1;
+}
+
+// X13 内联位图说谎：data:image/png;base64 的图标同样有真实宽高，声明改一个数就必须点名。
+// 这一刀只在有内联图标的仓下（pour / staircase）——它们把"零二进制文件"的承诺写在自己的测试里，
+// 位图只可能住在这里；而 P 段原先只筛 .png 文件，对这一路永远绿，等于声明 512x512 而真图 192x192
+// 也照样上线。针里不写哈希：哈希由 payload 算出，改了 sizes 它不变，写了反而把刀口绑死在一张图上。
+if (dataIcons.length) {
+  const pick = dataIcons[0];
+  // 基线是绿的，所以声明值就等于 IHDR 真值；针只改高一个像素，宽不动免得顶歪 R5/R6 的档位。
+  const [pw, ph] = pick.sizes.split('x').map(Number);
+  if (!knife('X13 内联位图尺寸与真图不符', ['P2', 'data:image/png#'], (dir) => {
+    const mf = mfOf(dir);
+    const hit = [mf.icons || [], mf.screenshots || [], ...(mf.shortcuts || []).map((s) => s.icons || [])]
+      .flat().find((i) => String(i.src).trim() === pick.src);
+    if (!hit || !hit.sizes) throw new Error('内联位图在 manifest 里没有可改的 sizes（刀口打空）');
+    hit.sizes = `${pw}x${ph + 1}`;
+    putMf(dir, mf);
+  }, () => `声明被改成 ${pw}x${ph + 1}（宽不动，免得顺带把 R5/R6 的档位也顶歪）`)) bad += 1;
+} else {
+  line('X13 SKIP · manifest 里没有内联 data:image/png 图标（这一仓的位图都是文件）');
 }
 
 // X8 workflow 不走那份清单（回到手抄三行的世界）。针打的是**调用那一行**：pages.yml 的注释里
@@ -200,9 +256,12 @@ if (!knife('X8 pages.yml 不调 assemble', ['W2'], (dir) => {
 })) bad += 1;
 
 // X9 闸不在每次 merge 前的 CI 里跑：坏清单能一路活到上线。
+// 替换掉的那一行不写任何看起来像路径的名字：pour 的仓形测试会扫 tools/ 下每一支脚本的文本，
+// 凡是「目录/文件.ext」形状的 token 都当成本仓的承诺去查存在性——刀口用一个不存在的路径，
+// 红的是台架自己写的字符串。
 if (!knife('X9 ci.yml 不跑闸', ['W4'], (dir) => {
   edit(dir, '.github/workflows/ci.yml', 'run: node tools/deploy-set.mjs',
-    'run: node tools/deploy-set-removed.mjs');
+    'run: echo "gate not wired"');
 })) bad += 1;
 
 // X11/X12 打的是 R7 的两个方向：这句话退回相对写法（抓取器不补 /<slug>/，卡片没图），

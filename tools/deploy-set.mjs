@@ -14,7 +14,8 @@
 //     背后的整条 import 图，以及每一站里的运行时路径（new URL / serviceWorker.register /
 //     scope / './' 打头的字面量）。逐个必须在产物里存在且非 0 字节。
 //   R 不许绝对路径：'/sw.js' 在 Pages 的 /<repo>/ 前缀下会跳出项目站点
-//   P 位图不许说谎：manifest 声明的 sizes 必须等于 PNG IHDR 的真实宽高
+//   P 位图不许说谎：manifest 声明的 sizes 必须等于 PNG IHDR 的真实宽高——文件图标读文件的
+//     IHDR，内联 data:image/png;base64 的图标解码后读同一段，两种都不许只信声明
 //
 // 防自己空转：条数钉在 EXPECT_CHECKS / EXPECT_ROWS，解析不到引用（而不是引用都齐）也是红。
 // 这两条会不会真的红由 tools/deploy-set-selftest.mjs 当场证明（那支脚本把仓库复制到临时目录、
@@ -23,6 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -257,7 +259,7 @@ for (let k = 0; k < refs.length; k += 1) {
   const code = stripComments(text, false);
   // 调用点优先于 SELF_REL：同一个字符串在一份文件里被两种形式认到时，只有调用点知道浏览器
   // 会拿谁作基。让 SELF_REL 也推进去不会多验一条——它按本文件解析出的那条路径根本没人请求，
-  // 于是 register('./sw.js')（以文档为基，要的是仓根那份）会被报成缺 js/sw.js。
+  // 于是 register('./sw.js')（以文档为基，要的是仓根那份）会被报成缺仓根以外的那一条路径。
   const claimed = new Set();
   for (const [re, perFile] of CALL_SITES) {
     for (const m of code.matchAll(re)) { push(r, m[1], perFile ? dirOf(r) : ''); claimed.add(m[1]); }
@@ -269,9 +271,12 @@ for (let k = 0; k < refs.length; k += 1) {
 
 // 钉住的条数要有人能对着源码核：DEPLOY_SET_DUMP=1 把每一条引用连同出处与解析结果打出来。
 // 只打不计数，所以开着它跑，rows 与 EXPECT_ROWS 的关系不变。
+// 内联位图的 payload 只打前 40 个字符：一条 178 KB 的 data URI 打进管道会顶穿 stdout 的缓冲，
+// 而 process.exit() 不等它排干——出处表于是断在半路，读它的人（台架）拿到的是半条引用。
 if (process.env.DEPLOY_SET_DUMP) {
   for (const [from, spec, at] of refs) {
-    console.log('ref\t' + from + '\t' + spec + (at ? '\t@' + at : '') + '\t=> ' +
+    const shown = /^data:/i.test(spec) ? spec.slice(0, 40) + `…(${spec.length} B)` : spec;
+    console.log('ref\t' + from + '\t' + shown + (at ? '\t@' + at : '') + '\t=> ' +
       (external(spec) || spec.startsWith('/') ? '(不查：外链或绝对)' : resolveSpec(spec, at)));
   }
 }
@@ -296,23 +301,32 @@ ok(checks > 0, 'R11 至少解析出一条引用（0 条=引用没被读到，不
 ok(checks === EXPECT_CHECKS, `R12 引用条数等于钉在文件里的 EXPECT_CHECKS（${EXPECT_CHECKS}）`,
   '实际 ' + checks + ' 条：改了页面就把 EXPECT_CHECKS 一起改，别让它默默变少');
 
+let bitmaps = 0;
+const sized = new Set();
 // ---- D：位图不许说谎 ----
 // 口径与 R 段同一份 entries：凡是 manifest 里声明了 sizes 的 PNG，声明值必须等于 IHDR 真实宽高。
 // 同一张图被两处声明成同一个尺寸时只核一次，但缺文件的那条由 R 段点名，这里跳过不重复报。
-let bitmaps = 0;
-const sized = new Set();
+// 内联 base64 也是位图：只按"是不是 .png 文件"筛的话这一条对它们永远成立，声明 512x512 而图
+// 其实 192x192 查不出来。pour / staircase 把"仓里零二进制文件"写进了自己的测试（.png 一律不许存在），
+// 它们的图标只能住在 manifest 的 data URI 里——真宽高同样得从 IHDR 读，不能因为不是文件就放行。
 for (const e of entries) {
   if (!e.sizes) continue;
-  const r = rel(e.src);
-  if (!/\.png$/i.test(r)) continue;
+  const dm = /^data:image\/png;base64,([\s\S]+)$/i.exec(e.src);
+  const r = dm ? `data:image/png#${createHash('sha1').update(dm[1]).digest('hex').slice(0, 10)}` : rel(e.src);
+  if (!dm && !/\.png$/i.test(r)) continue;
   const key = r + '@' + String(e.sizes);
   if (sized.has(key)) continue;
   sized.add(key);
   bitmaps += 1;
-  const f = path.join(site, r);
-  if (!fs.existsSync(f)) continue; // R 段已经报过缺文件
-  const head = fs.readFileSync(f).subarray(0, 24);
-  const isPng = head.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+  let head;
+  if (dm) {
+    head = Buffer.from(dm[1].replace(/\s+/g, ''), 'base64').subarray(0, 24);
+  } else {
+    const f = path.join(site, r);
+    if (!fs.existsSync(f)) continue; // R 段已经报过缺文件
+    head = fs.readFileSync(f).subarray(0, 24);
+  }
+  const isPng = head.length === 24 && head.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
   ok(isPng, `P1 ${r} 是真 PNG 容器`, '不是 PNG 签名');
   if (!isPng) continue;
   const w = head.readUInt32BE(16), h = head.readUInt32BE(20);
@@ -329,4 +343,5 @@ ok(rows + 1 === EXPECT_ROWS, `R13 这一次跑出的断言条数（含这一条�
 for (const f of fails) console.log('  FAIL ' + f);
 console.log(`部署集：${checks} 条引用（含 ${bitmaps} 张位图尺寸核对），失败 ${fails.length} 项`);
 console.log(`rows: ${rows} fail: ${fails.length}`);
-process.exit(fails.length === 0 && rows > 0 ? 0 : 1);
+// exitCode 而不是 exit()：exit() 不等 stdout 排干，长出处表会被截断在半条引用上。
+process.exitCode = fails.length === 0 && rows > 0 ? 0 : 1;
