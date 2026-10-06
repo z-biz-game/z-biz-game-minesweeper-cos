@@ -5,3 +5,4 @@ _site/
 .DS_Store
 *.log
 tools/shots/
+_scratch/
