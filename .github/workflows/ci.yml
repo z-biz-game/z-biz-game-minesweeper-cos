@@ -22,13 +22,7 @@ jobs:
       # No npm install: the game has zero runtime dependencies, and pulling Electron into
       # CI to prove nothing is how a repo starts failing on a network flake.
       - name: Syntax check every source
-        run: |
-          for f in $(git ls-files 'js/*.js' 'js/*/*.js'); do node --check "$f" || exit 1; done
-          node --check server.cjs
-          node --check electron/main.cjs
-          node --check electron/preload.cjs
-          for f in $(git ls-files 'tools/*.mjs'); do node --check "$f" || exit 1; done
-
+        run: npm run check
       # The real gate: every generated board must have one solution and be reachable by
       # pencil logic. This is a plain Node test, so it guards merges without a browser.
       - name: Engine tests
