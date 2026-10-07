@@ -26,7 +26,9 @@ npm run electron     # 桌面壳（electron/main.cjs，同一份代码）
 ```bash
 npm run check        # 逐文件 node --check 语法门禁
 npm test             # 引擎断言 167 项：求解器可靠性 / 生成保证 / 规则 / 存档形状
-npm run balance      # 难度实测台：每档 3 000 候选的分数分位、入选率、求解代价
+npm run balance      # 难度实测台（也是门禁）：每档 3 000 候选的分数分位、入选率、求解代价，
+                     # 外加把分位上的 25 局交给 solve() 重放。说谎、某档 NULL／空表、出货掉出
+                     # band、探针排不满 25 个——任何一条都退出非 0。CI 与 npm run verify 都跑它
 npm run verify       # 无头 Chrome 跑 7 个浏览器场景（需本机 Chrome，见下）
 ```
 
@@ -65,7 +67,9 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 | `Z` / `Y` / `H` / `Esc` | 撤销 / 重做 / 求助 / 回首页（求助会记进成绩） |
 | 线索推满 | 该数字剩余的未知格自动补旗（可在设置里关掉，关掉后**真的**由你自己插） |
 
-五档难度，全部由求解器实测分数定档（下表是 `npm run balance` 每档 3 000 候选的实测）：
+五档难度，全部由求解器实测分数定档（下表是 `npm run balance` 每档 3 000 候选的实测，
+本机 2026-10-07 的读数；「入选率」「次数」两列是那台架确定性复现的，最后一列的 ms 是墙钟、
+不参与任何断言）：
 
 | 档 | 盘面 · 雷数 | 难度带 | 入选率 | 出题代价 | 特征 |
 |---|---|---|---|---|---|
@@ -104,7 +108,22 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 - 同一份测试再把每档 8 局交给 `nextHint()` **一步一步**地走，动作全部经过 `Game` 的真实规则层
   （dig / flood / chord / 自动插旗 / 胜负判定）。批量求解器和单步推荐器是两段不同的代码，
   规则层又是第三个来源——三者同时说"能推到底"，才叫证据；求解器有 bug 会当场红。
-- `npm run balance` 末尾的 `solver cross-check` 再把分数分布的五个探针档各挑一局重放一遍。
+- `npm run balance` 末尾的 `solver cross-check` 把分位表上的 5 个秩（最小 / p25 / 中位 / p95 /
+  最大）各取**表上那批盘本身**交给 `solve()` 重放，五档共 25 局，并逐档打印 `tier ok/n`。
+  以前这一步是"另外再搜一批同分数的盘"：样本越大反而搜不满（本机 2026-10-07 的读数，
+  N=60 验到 25 局、N=300 验到 20 局、N=3000 只验到 18 局，每一跑都报「k/k replays clean」），
+  还把整台拖到 ~110 s。改成直接复用上一步留下的真盘之后，
+  覆盖固定在 25 局、整台 ~5 s（本机 2026-10-07），并因此进得了 CI。
+
+这台架的退出码是 2026-10-07 在仓库副本里一刀一刀验出来的（`_scratch/ms-bal/`，真树不动；
+每一刀都要求 `node tools/balance.mjs` 点名红并返回非 0）：把 `solver.js` 的 `noGuess: clearable`
+改成恒真 ⇒ `CROSS-CHECK FAIL` 15 条、`FAIL solver cross-check: 15 局说谎`，且逐档计数当场写成
+`commando 0/5`；把突击队档的 `mines` 改成 480（贴满脸）⇒ 同时报「3000 个候选里一个盘都没入选」
+「60/60 个种子返回 NULL」「只排到 20 个探针，应排 25」；把 `generate.js` 里突击队的 band 收到
+`[1, 2]` ⇒ `FAIL commando 出货分数有 60 局落在 band [1,2] 之外`；`node tools/balance.mjs 6` ⇒ 样本太短，
+探针排不满同样红；对照组不刀任何东西 ⇒ rc 0、`25/25 replays clean`。最后再连跑两遍：去掉两处
+计时列（`ms/cand` 与 `ms/board`）之后 12 行逐行相等，也就是分数、入选率、次数、探针计数是
+确定性的，只有墙钟会漂——所以没有任何断言吃 ms。
 
 ---
 
@@ -140,7 +159,8 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 |---|---|
 | 每局可纯逻辑推到底 | `npm test`（125 盘逐格复核 + 40 盘只吃提示走真实规则通关）、`verify gen`（每档 3 盘 `stuckSafe === 0`） |
 | 首次点击一定安全 | `verify engine`：逐格检查开局格的八邻无雷；`verify play`：挖别的格一律拒绝 |
-| 难度带是真测出来的 | `verify gen` + `npm test`：命中率、每盘尝试次数上限、**五档分数带互不重叠** |
+| 难度带是真测出来的 | `verify gen` + `npm test`：命中率、每盘尝试次数上限、**五档分数带互不重叠**；`npm run balance`：每档 60 局出货分数逐局落在 `[band[0], band[1]]`，掉出去就红 |
+| 求解器不会谎报"这盘不用猜" | `npm test`（125 盘逐格复核）+ `npm run balance` 的 cross-check：分位上那 25 盘重放，翻开过雷／点的雷比盘上多／说 noGuess 却还有安全格没开，都点名红；探针排不满 25 也红 |
 | 提示永不把你送上雷 | `verify hint`：三档全程只吃提示，逐格比对建议与真实雷图 |
 | 提示只给可推导的格 | `verify hint`：只吃提示也能清空整盘（trainee / scout / commando 三档） |
 | 提示解释规则并指出坐标 | `verify hint`：每条文案必须含 `N行M列` |

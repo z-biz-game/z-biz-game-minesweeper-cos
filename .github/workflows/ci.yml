@@ -28,6 +28,12 @@ jobs:
       - name: Engine tests
         run: node tools/engine-test.mjs
 
+      # 难度实测台：这台架以前只打印结论、退出码恒 0，Cross-check 说谎、某档 NULL、出货掉出
+      # band 都是带着 0 离场的，所以没有任何一步能因它而红。探针改成直接重放表上那批盘之后，
+      # 整台从 ~110 s 降到 ~5 s（本机 2026-10-07），可以进合入门禁了。
+      - name: Difficulty balance (bands, acceptance, solver replay cross-check)
+        run: node tools/balance.mjs
+
       - name: Entry files exist
         run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html
       # 部署集闸：按 tools/assemble-site.sh 那份清单真拷一遍产物，要求页面会去要的东西

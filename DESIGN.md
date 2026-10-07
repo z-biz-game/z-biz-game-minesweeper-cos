@@ -93,6 +93,9 @@ README 里那张实测表就成了一句修辞。
 手改 band 让它"看起来对"会让生成器退化成随机布雷：带子高过可达上限时不会报错，只会
 永远返回"最接近的那个失败候选"，症状是突击队变成"加载很慢的那一档"。
 `npm test` 与 `verify gen` 都断言 in-band 命中率、每盘尝试次数上限、以及**五档分数带互不重叠**。
+上面那句"不会报错"现在有了闸：`npm run balance` 把每档 60 局出货分数对着 band 数一遍，掉出去就
+`FAIL … 出货分数有 N 局落在 band [a,b] 之外` 并退出非 0（2026-10-07 用把突击队 band 收到 `[1, 2]`
+的刀证过这条会红，那一刀下 60/60 全掉出去）。同一台还盯 cross-check 的探针计数与每档空表。
 
 ### 3.8 存档必须带代价
 `saveResume()` 除了 RLE 盘面还存 `moves` / `hints`，`begin({restore})` 再把它们装回 `Game`。
@@ -164,7 +167,7 @@ js/store.js            (158) 单键 localStorage、RLE 盘面、recordBest 判�
 js/render/board.js     (292) layout() 推导尺寸、hitTest()、render()（旗/雷/数字/开花/爆炸/光标）
 js/ui/game.js          (399) Game：动作与撤销 entry、自动插旗、hint 对账、计时与暂停
 js/main.js             (823) 三屏路由、菜单、输入接线、结算文案、window.minesweeper 验证入口
-tools/                         engine-test(466) / balance(129) / playtest CDP(186) / scenarios(613) / verify.sh(122)
+tools/                         engine-test(466) / balance(167) / playtest CDP(186) / scenarios(613) / verify.sh(131)
 ```
 
 ## 7. 明确不做

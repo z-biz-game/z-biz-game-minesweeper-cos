@@ -118,6 +118,10 @@ if [ -n "${SHOTS:-}" ]; then
 fi
 
 kill $WD 2>/dev/null
+# 难度实测台：ci.yml 的 check job 跑同一句。它的结论（cross-check 重放、某档 NULL、出货掉出
+# band、探针排不满）现在进退出码。~5 s，不碰 Chrome。
+echo "=== balance ==="
+node tools/balance.mjs || FAILED=1
 # 部署集闸：ci.yml 跑这两步、本地整闸以前一次都不跑。缺这一步就是「本地全绿、线上 404 自己的
 # manifest / sw.js / 图标」这一整类坏法。它不碰 Chrome，也不读页面，纯查产物。
 echo "=== deploy-set ==="
