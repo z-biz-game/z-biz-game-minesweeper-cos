@@ -11,7 +11,7 @@ canvas 现画，音效由 WebAudio 合成，界面只有一个 `<canvas>`。
   `generate.js` 里的分档表照那张表写，测试再盯着那张表不漂移。
 - 提示不是答案：提示跑的是**同一个**求解器，所以它必须说出用了哪条规则、钉在哪一格；
   你插错的旗它也会指出来并替你拔掉，而不是假装没看见。
-- 规模：10 个 ES Module / 2,538 行 JS + 5 个验证脚本 / 1,516 行 + 389 行 CSS/HTML，**运行时依赖 0 个**。
+- 规模：10 个 ES Module / 2,538 行 JS + 8 个验证脚本 / 2,210 行 + 389 行 CSS/HTML，**运行时依赖 0 个**。
 - **在线试玩**：<https://z-biz-game.github.io/z-biz-game-minesweeper-cos/>（`main` 分支推送即自动部署）
 
 ---
@@ -25,9 +25,10 @@ npm run electron     # 桌面壳（electron/main.cjs，同一份代码）
 
 ```bash
 npm run check        # 逐文件 node --check 语法门禁
-npm test             # 五把闸共 374 项断言，全部只要 node：引擎 167 / PWA 91 / 存档 60 / 帧率 40 / 静音 16
-                     # （每把都自带负控——把实现改坏，对应那条会红，不是只数文件里的字样）
-npm run balance      # 难度实测台：每档 3 000 候选的分数分位、入选率、求解代价
+npm test             # 引擎断言 167 项：求解器可靠性 / 生成保证 / 规则 / 存档形状
+npm run balance      # 难度实测台（也是门禁）：每档 3 000 候选的分数分位、入选率、求解代价，
+                     # 外加把分位上的 25 局交给 solve() 重放。说谎、某档 NULL／空表、出货掉出
+                     # band、探针排不满 25 个——任何一条都退出非 0。CI 与 npm run verify 都跑它
 npm run verify       # 无头 Chrome 跑 7 个浏览器场景（需本机 Chrome，见下）
 ```
 
@@ -68,7 +69,9 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 | `Alt+Enter` / `?` | 全屏（被系统拒绝会给一句 toast，不静默）/ 打开这张操作表 |
 | 线索推满 | 该数字剩余的未知格自动补旗（可在设置里关掉，关掉后**真的**由你自己插） |
 
-五档难度，全部由求解器实测分数定档（下表是 `npm run balance` 每档 3 000 候选的实测）：
+五档难度，全部由求解器实测分数定档（下表是 `npm run balance` 每档 3 000 候选的实测，
+本机 2026-10-07 的读数；「入选率」「次数」两列是那台架确定性复现的，最后一列的 ms 是墙钟、
+不参与任何断言）：
 
 | 档 | 盘面 · 雷数 | 难度带 | 入选率 | 出题代价 | 特征 |
 |---|---|---|---|---|---|
@@ -107,7 +110,22 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 - 同一份测试再把每档 8 局交给 `nextHint()` **一步一步**地走，动作全部经过 `Game` 的真实规则层
   （dig / flood / chord / 自动插旗 / 胜负判定）。批量求解器和单步推荐器是两段不同的代码，
   规则层又是第三个来源——三者同时说"能推到底"，才叫证据；求解器有 bug 会当场红。
-- `npm run balance` 末尾的 `solver cross-check` 再把分数分布的五个探针档各挑一局重放一遍。
+- `npm run balance` 末尾的 `solver cross-check` 把分位表上的 5 个秩（最小 / p25 / 中位 / p95 /
+  最大）各取**表上那批盘本身**交给 `solve()` 重放，五档共 25 局，并逐档打印 `tier ok/n`。
+  以前这一步是"另外再搜一批同分数的盘"：样本越大反而搜不满（本机 2026-10-07 的读数，
+  N=60 验到 25 局、N=300 验到 20 局、N=3000 只验到 18 局，每一跑都报「k/k replays clean」），
+  还把整台拖到 ~110 s。改成直接复用上一步留下的真盘之后，
+  覆盖固定在 25 局、整台 ~5 s（本机 2026-10-07），并因此进得了 CI。
+
+这台架的退出码是 2026-10-07 在仓库副本里一刀一刀验出来的（`_scratch/ms-bal/`，真树不动；
+每一刀都要求 `node tools/balance.mjs` 点名红并返回非 0）：把 `solver.js` 的 `noGuess: clearable`
+改成恒真 ⇒ `CROSS-CHECK FAIL` 15 条、`FAIL solver cross-check: 15 局说谎`，且逐档计数当场写成
+`commando 0/5`；把突击队档的 `mines` 改成 480（贴满脸）⇒ 同时报「3000 个候选里一个盘都没入选」
+「60/60 个种子返回 NULL」「只排到 20 个探针，应排 25」；把 `generate.js` 里突击队的 band 收到
+`[1, 2]` ⇒ `FAIL commando 出货分数有 60 局落在 band [1,2] 之外`；`node tools/balance.mjs 6` ⇒ 样本太短，
+探针排不满同样红；对照组不刀任何东西 ⇒ rc 0、`25/25 replays clean`。最后再连跑两遍：去掉两处
+计时列（`ms/cand` 与 `ms/board`）之后 12 行逐行相等，也就是分数、入选率、次数、探针计数是
+确定性的，只有墙钟会漂——所以没有任何断言吃 ms。
 
 ---
 
@@ -143,7 +161,8 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 |---|---|
 | 每局可纯逻辑推到底 | `npm test`（125 盘逐格复核 + 40 盘只吃提示走真实规则通关）、`verify gen`（每档 3 盘 `stuckSafe === 0`） |
 | 首次点击一定安全 | `verify engine`：逐格检查开局格的八邻无雷；`verify play`：挖别的格一律拒绝 |
-| 难度带是真测出来的 | `verify gen` + `npm test`：命中率、每盘尝试次数上限、**五档分数带互不重叠** |
+| 难度带是真测出来的 | `verify gen` + `npm test`：命中率、每盘尝试次数上限、**五档分数带互不重叠**；`npm run balance`：每档 60 局出货分数逐局落在 `[band[0], band[1]]`，掉出去就红 |
+| 求解器不会谎报"这盘不用猜" | `npm test`（125 盘逐格复核）+ `npm run balance` 的 cross-check：分位上那 25 盘重放，翻开过雷／点的雷比盘上多／说 noGuess 却还有安全格没开，都点名红；探针排不满 25 也红 |
 | 提示永不把你送上雷 | `verify hint`：三档全程只吃提示，逐格比对建议与真实雷图 |
 | 提示只给可推导的格 | `verify hint`：只吃提示也能清空整盘（trainee / scout / commando 三档） |
 | 提示解释规则并指出坐标 | `verify hint`：每条文案必须含 `N行M列` |
@@ -174,3 +193,49 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-minesweeper-cos/ npm run verify
 MIT（见 [LICENSE](LICENSE)）。CI 是纯 Node 的语法 + 引擎断言门禁，**不跑 `npm install`**（运行时零依赖，
 装依赖只会把 CI 变成网络的函数）。Pages 走文件复制（`index.html` + `css/` + `js/`），不打包、不传 `node_modules`。
 维护者看的实现说明、不变量与踩过的坑在 [DESIGN.md](DESIGN.md)。
+
+## 上线的到底是哪一批文件
+
+这个仓没有打包器：站点=一次文件拷贝。以前「拷哪些」写在 `pages.yml` 的 `run:` 里（手抄的几行
+`cp`）。本地 `index.html` 直读仓库根，永远自洽；线上却按那份清单拷，于是页面后来引用的
+`manifest.webmanifest`、`sw.js`、`icons/*` 可能一个都没上去——线上 404，而仓里的引擎测试与
+真浏览器闸全绿，因为它们跑的都是仓库根，没有任何一步在「按清单拷」的那个环境下加载过页面。
+
+现在清单只有一份，住在 `tools/assemble-site.sh`：CI 调它拷 `_site`，本地闸调它拷临时目录，
+然后**对拷出来的产物**提要求（`tools/deploy-set.mjs`）：
+
+- **W 清单与页面同源**：`pages.yml` 里必须真有 `run: bash tools/assemble-site.sh <dir>` 这一行，
+  `ci.yml` 里必须真有 `run: node tools/deploy-set.mjs`。认的是调用那一行，不是文件里出现过这个
+  路径——注释里本来就会写它，只 grep 字符串会被一句散文喂绿。
+- **R 引用可达**：引用不靠手打名单。从 `index.html` 的 `href/src` 出发，凡解析出来是 `.js`/`.css`
+  的就把那一站也扫一遍（CSS 的 `url()`、JS 去掉注释后的 `'./…'` 字面量、`new URL(x, base)` 的两种
+  基、`navigator.serviceWorker.register`、`scope`），`manifest` 的 icons/screenshots/shortcuts 各自
+  的 `src` 也算引用。取径上读不到的那一站本身就是红（读不到＝这一站根本没扫）。每条引用都必须在
+  产物里且非 0 字节；绝对路径单列一条红，因为 Pages 挂在 `/<repo>/` 前缀下会跳出去。
+- **P 位图不许说谎**：`manifest` 声明的 `sizes` 必须等于 PNG IHDR 的真实宽高——文件图标读文件头，
+  内联成 base64 的图标先解码再读同一段。后一条不是可选项：图标可能住在清单里而不是盘上的 `.png`
+  （有的仓另有一条"零二进制文件"的承诺，那条只约束"有没有 .png 这个文件"）；如果 P 段只筛文件名，
+  声明写 512 而真图 192 就一路放行。
+- **钉住两个数**：R 段实际检查的路径条数（`31`）与这一次跑的断言条数（`49`），两个数
+  都钉在 `tools/deploy-set.mjs` 顶部的那对常量里。没改页面却掉了，说明解析断了；删掉一张图标会同时
+  少一条 R10 与那张的 P1/P2，所以两个数一起钉，断言条数能漂就是闸在缩水的信号。这一节故意只写数值、
+  不写那对常量的名字，也不写别仓文档闸的编号：有的仓的文档闸会拿"文档里出现过的同名标识号"回数它
+  自己的条数，还有的会把文档里点到的每个组编号逐个核对"这一轮真的发过"——两道闸共用一个名字，
+  或者在本仓的文档里出现一个本仓没有的组编号，打红的都是不相干的那一边。
+
+`tools/deploy-set-selftest.mjs` 是这两颗钉的阳性证明：它把仓库复制到临时目录，照着每一类断言
+各下一刀（X1 清单不收位图目录 / X2 模块边改名 / X3 CSS 写绝对路径 / X4 `start_url` 绝对 /
+X5 删光 >=512 图标 / X6 少一个必填字段 / X7 声明尺寸与真图不符 / X8 workflow 不调脚本 /
+X9 CI 不跑闸 / X10 是阴性对照——往入口 JS 追加一行只写在注释里的假路径，闸必须仍然绿、条数仍然
+`31`、断言仍然 `49`；X11 og:image 退回相对路径 / X12 og:image 的前缀指向别的 slug /
+X13 内联位图谎报尺寸——只在有靶子时下：X11/X12 要页面上那句 og:image，X13 要清单里真有一段 base64
+图标，没有就打印 SKIP；反过来 X1 没有位图目录可砍时改砍 css，P 段一位都不核时台架直接报靶子不够），
+要求每一刀都让闸**点名**变红。靶子从 `DEPLOY_SET_DUMP=1`
+的出处表现挑（取径真的会读的那支 JS / 那一张 CSS，不写死某一个仓的入口名），所以页面改了、仓与仓
+不同，台架跟着走。
+
+`node tools/deploy-set.mjs` 与 `node tools/deploy-set-selftest.mjs` 就是 CI 跑的那两条命令本身
+（package.json 里的 `deploy-set` / `deploy-set:selftest` 只是同一支脚本的 npm 入口）；本仓的整闸在 `tools/verify.sh` 的 `=== deploy-set ===` 那一段也各跑一次。它们红的时候并进本仓那条出口的退出码——这一条是这么证的：
+把 ci.yml 里那行 `run: node tools/deploy-set.mjs` 砍掉，本仓整闸必须点名红且退出码非 0。
+所以「本地全绿、线上 404 自己的 manifest / sw.js / 图标」这一类坏法在本地就会红。
+

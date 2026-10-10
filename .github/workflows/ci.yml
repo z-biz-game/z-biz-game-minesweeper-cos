@@ -22,38 +22,29 @@ jobs:
       # No npm install: the game has zero runtime dependencies, and pulling Electron into
       # CI to prove nothing is how a repo starts failing on a network flake.
       - name: Syntax check every source
-        run: |
-          for f in $(git ls-files 'js/*.js' 'js/*/*.js'); do node --check "$f" || exit 1; done
-          node --check server.cjs
-          # sw.js 在仓根、不在上面两个 glob 里。它有语法错时浏览器只是"没装 ServiceWorker"，
-          # 不报错、不红，整站的离线能力静默失效——所以单独 check 一行。
-          node --check sw.js
-          node --check electron/main.cjs
-          node --check electron/preload.cjs
-          for f in $(git ls-files 'tools/*.mjs'); do node --check "$f" || exit 1; done
-
+        run: npm run check
       # The real gate: every generated board must have one solution and be reachable by
       # pencil logic. This is a plain Node test, so it guards merges without a browser.
       - name: Engine tests
         run: node tools/engine-test.mjs
 
-      # 可安装性的真值：manifest 每个图标在盘上且 IHDR 与 sizes 一致；sw 真的网络优先、
-      # 断网回落外壳、旧版本缓存被清；注册在 file:// 下不发生也不抛红。纯 node。
-      - name: PWA installability gate
-        run: node tools/pwa-test.mjs
-
-      # 三把"行为尺"，都不需要浏览器，全部自带负控（把实现改坏就会红）：
-      #   save  存档坏一条只丢那一条，坏记录不许炸启动
-      #   rate  同一局在 30/60/120Hz 画出同一帧，暂停时表针真的停
-      #   audio 静音是挂起上下文 + 零节点，不是 gain=0
-      - name: Save / frame-rate / audio behaviour gates
-        run: |
-          node tools/save-test.mjs
-          node tools/rate-test.mjs
-          node tools/audio-test.mjs
+      # 难度实测台：这台架以前只打印结论、退出码恒 0，Cross-check 说谎、某档 NULL、出货掉出
+      # band 都是带着 0 离场的，所以没有任何一步能因它而红。探针改成直接重放表上那批盘之后，
+      # 整台从 ~110 s 降到 ~5 s（本机 2026-10-07），可以进合入门禁了。
+      - name: Difficulty balance (bands, acceptance, solver replay cross-check)
+        run: node tools/balance.mjs
 
       - name: Entry files exist
         run: test -f index.html && grep -q '<canvas' index.html && grep -q 'js/main.js' index.html
+      # 部署集闸：按 tools/assemble-site.sh 那份清单真拷一遍产物，要求页面会去要的东西
+      # 都在里面。这一仓曾经因为清单落后于页面而线上 404 自己的 manifest/sw.js/图标，
+      # 而本地一切全绿——因为本地根本没有「按清单拷」这一步。
+      - name: Deploy set gate
+        run: node tools/deploy-set.mjs
+      # 阴性自证：每一类断言当场被打红一次，闸必须点名吃掉那一刀；写在注释里的假路径
+      # 必须不算引用。钉住的条数由这一跑证明它真的会红，不是由记性证明。
+      - name: Deploy set gate proves it can fail
+        run: node tools/deploy-set-selftest.mjs
 
   # 真浏览器闸：headless Chrome + CDP，读 DOM 文本/几何与画布像素，不读内部标志位。
   # 独立 job，node 22 而不是 check job 的 20：台架是裸 CDP 驱动，用的是 Node 22 才有的全局

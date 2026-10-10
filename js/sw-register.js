@@ -1,12 +1,12 @@
 'use strict';
-// PWA 注册：只在 http(s) 下做。file://（Electron 直接打开、本地双击 index.html）拿不到
-// serviceWorker 注册权限，那不是玩家的错，静默跳过，不在控制台抛红。
-(function () {
-  var http = location.protocol === 'http:' || location.protocol === 'https:';
-  if (!http || !('serviceWorker' in navigator)) return;
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js').catch(function () {
-      // 注册失败（无 SW 支持的旧 Safari、无痕窗口）不影响游戏，玩家照常能玩。
-    });
+// service worker 注册：只在 http/https 下做。
+//
+// file:// 直接打开（双击 index.html、或把仓库 zip 解开看）时 navigator.serviceWorker
+// 要么不存在、要么 register 必抛 SecurityError。那不是玩家的错，不该在控制台上留一条
+// 红字，更不该让后面真正该跑的 main.js 因为这条未捕获异常被中断。
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => {
+    // 相对 sw.js 而不是绝对 /sw.js：Pages 的项目站挂在 /<repo>/ 子路径下。
+    navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
   });
-})();
+}

@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"><meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#0F0F0F">
-<meta name="description" content="扫雷 MINESWEEPER —— 每一局都保证可以用纯逻辑推到底，永不靠猜。生成器实测零猜测，难度分由求解器量出。">
+<meta name="description" content="扫雷 MINESWEEPER —— 每一局都保证可以用纯逻辑推到底，永不靠猜。生成器实测零猜测，难度分由求解器量出。"><meta property="og:title" content="扫雷 · Minesweeper"><meta property="og:description" content="扫雷 MINESWEEPER —— 每一局都保证可以用纯逻辑推到底，永不靠猜。生成器实测零猜测，难度分由求解器量出。"><meta property="og:image" content="https://z-biz-game.github.io/z-biz-game-minesweeper-cos/icons/icon-512.png"><meta name="twitter:image" content="https://z-biz-game.github.io/z-biz-game-minesweeper-cos/icons/icon-512.png">
 <title>扫雷 · Minesweeper</title>
 <link rel="icon" type="image/png" sizes="32x32" href="./assets/icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/favicon-192.png">
@@ -25,6 +25,11 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="application-name" content="扫雷">
 <link rel="stylesheet" href="./css/game.css">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
 <div id="app">
@@ -85,6 +90,8 @@
   <section class="screen" id="screen-game" data-screen="game" hidden>
     <header class="hud">
       <button class="icon-btn" id="btn-back" aria-label="返回">‹</button>
+      <button id="btn-fullscreen" class="icon-btn" type="button" aria-pressed="false" aria-label="全屏" title="全屏（F）">⛶</button>
+      <button id="btn-sound" class="icon-btn" type="button" aria-pressed="true" aria-label="音效开关" title="静音 / 恢复音效 · M">♪</button>
       <div class="hud-title">
         <strong id="hud-name">—</strong>
         <span id="hud-tier" class="muted">—</span>
@@ -171,5 +178,6 @@
 
 <script src="./js/sw-register.js"></script>
 <script type="module" src="./js/main.js"></script>
+  <script src="js/sw-register.js"></script>
 </body>
 </html>
