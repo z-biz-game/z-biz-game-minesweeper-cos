@@ -1,0 +1,42 @@
+/* z-biz-game studio polish layer -- additive, specificity-0, never overrides game CSS.
+   Injected fleet-wide to lift the visual floor: dark-first atmosphere, cohesive tokens,
+   consistent focus/selection/scrollbar, and safe :where() control/panel defaults. */
+:root{
+  --studio-bg-0:#0e0f1a; --studio-bg-1:#161a2c; --studio-bg-2:#1f2438;
+  --studio-surface:rgba(255,255,255,.045); --studio-surface-2:rgba(255,255,255,.08);
+  --studio-ink:#f3f4fb; --studio-ink-dim:rgba(243,244,251,.62);
+  --studio-accent:#e8b15c; --studio-accent-2:#6ea8ff;
+  --studio-ok:#3ecf8e; --studio-bad:#ff6b6b; --studio-warn:#ffce5a; --studio-info:#74b9ff;
+  --studio-ring:var(--studio-accent);
+  --studio-r-card:18px; --studio-r-btn:12px; --studio-r-tag:8px;
+  --studio-shadow:0 12px 34px -14px rgba(0,0,0,.55);
+  --studio-font:"PingFang SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --studio-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --studio-ease:cubic-bezier(.22,.61,.36,1);
+}
+/* atmosphere: fixed behind everything, never catches pointer events */
+.studio-atmosphere{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 50% -12%, rgba(110,168,255,.12), transparent 60%),
+    radial-gradient(90% 70% at 100% 112%, rgba(232,177,92,.09), transparent 55%),
+    linear-gradient(180deg,var(--studio-bg-1),var(--studio-bg-0));}
+html{color-scheme:dark light;-webkit-text-size-adjust:100%;}
+body{font-family:var(--studio-font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+*{box-sizing:border-box;}
+:where(button,[role=button],.btn,input,select,textarea){font:inherit;color:inherit;border-radius:var(--studio-r-btn);}
+:where(button,[role=button],.btn){cursor:pointer;
+  transition:transform .15s var(--studio-ease),box-shadow .15s var(--studio-ease),background .15s var(--studio-ease);}
+:where(button,[role=button],.btn):active{transform:translateY(1px) scale(.985);}
+:where(button,[role=button],.btn):focus-visible,
+:where(a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible){
+  outline:2px solid var(--studio-ring);outline-offset:2px;}
+:where(.card,.panel){border-radius:var(--studio-r-card);box-shadow:var(--studio-shadow);}
+::selection{background:rgba(232,177,92,.32);color:var(--studio-ink);}
+@media (pointer:fine){:where(html){scrollbar-color:var(--studio-surface-2) transparent;}}
+@media (prefers-reduced-motion:reduce){
+  :where(*,*::before,*::after){animation-duration:.001ms!important;
+    animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
+}
+@media (prefers-contrast:more){
+  :where(button,[role=button],.btn,a,input,select,textarea):focus-visible{outline-width:3px;}
+}
