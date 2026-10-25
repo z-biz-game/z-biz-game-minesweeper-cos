@@ -40,3 +40,6 @@ body{font-family:var(--studio-font);-webkit-font-smoothing:antialiased;text-rend
 @media (prefers-contrast:more){
   :where(button,[role=button],.btn,a,input,select,textarea):focus-visible{outline-width:3px;}
 }
+
+/* sec.3 typography: tabular figures for timers/scores */
+:where(body,button,input,select,textarea,.hud,.score,.timer,.counter,.stat,.num,.clock,.readout,.level,.level-display,.stars,.totals,.crumbs,.hud-counter,.hud-timer,.hud-level){font-variant-numeric:tabular-nums;}
