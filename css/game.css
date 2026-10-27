@@ -171,7 +171,7 @@ h3 { font: 700 18px/1.4 var(--font-sans); margin: 0 0 var(--space-inner); }
 .board-wrap {
   display: flex; justify-content: center; align-items: flex-start;
   flex: 1; min-height: 0; overflow: auto;
-  touch-action: none; border-radius: var(--radius-card);
+  touch-action: pinch-zoom; border-radius: var(--radius-card);
 }
 .board-wrap.shake { animation: shake 300ms var(--ease-ease); }
 @keyframes shake {
@@ -181,7 +181,7 @@ h3 { font: 700 18px/1.4 var(--font-sans); margin: 0 0 var(--space-inner); }
   60% { transform: translateX(-4px); }
   80% { transform: translateX(4px); }
 }
-canvas { display: block; border-radius: var(--radius-card); touch-action: none; }
+canvas { display: block; border-radius: var(--radius-card); touch-action: pinch-zoom; }
 canvas.grabbing { cursor: grabbing; }
 
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-inner); flex-wrap: wrap; margin-top: var(--space-inner); }
