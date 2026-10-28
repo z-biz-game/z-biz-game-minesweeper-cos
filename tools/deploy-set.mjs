@@ -31,11 +31,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSEMBLE = 'tools/assemble-site.sh';
 // R 段实际检查的路径条数。改页面/清单会改变它——那正是要它变的时候；没改页面却掉了，
 // 说明引用解析不出来的那部分被悄悄放过了。对着 DEPLOY_SET_DUMP=1 的出处表能逐条核。
-const EXPECT_CHECKS = 31;
+const EXPECT_CHECKS = 35;
 // 全绿时这个闸实际跑的断言条数（W/R/P 三段之和）。钉住它，「少一条断言」就不可能是绿的：
 // 删掉 manifest 里的一张图标会同时少一条 R10 与那张的 P1/P2 两行——那条路径缺文件本来就该红，
 // 但 rows 能漂就是闸在缩水的信号，所以两个数一起钉。
-const EXPECT_ROWS = 50;
+const EXPECT_ROWS = 55;
 
 let rows = 0;
 const fails = [];

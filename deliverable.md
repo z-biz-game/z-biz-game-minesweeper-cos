@@ -36,7 +36,7 @@ npm run electron     # 桌面壳（electron/main.cjs，同一份代码）
 | 指标 | 读数 |
 | --- | ---: |
 | 跟踪文件 | 57 |
-| 应用代码 | 3,696 行（JS 3,185 / CSS 324 / HTML 187） |
+| 应用代码 | 3,682 行（JS 3,179 / CSS 324 / HTML 179） |
 | 测试/工具文件 | 12 个 |
 | 依赖 | `dependencies` 0 / `devDependencies` 1 |
 | 位图资产（不含 shots） | 17 个 / 638 KB |

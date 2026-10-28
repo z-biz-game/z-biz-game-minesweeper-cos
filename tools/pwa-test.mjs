@@ -100,7 +100,20 @@ class Res {
 }
 class Bucket extends Map {
   async put(req, res) { this.set(typeof req === 'string' ? req : req.url, res); }
-  async match(req) { return this.get(typeof req === 'string' ? req : req.url); }
+  // 与真的 Cache.match 一样：字符串按 sw.js 的位置解析，命中装的是绝对键的桶。
+  async match(req) {
+    const key = typeof req === 'string' ? new URL(req, sandbox.location.href).href : req.url;
+    return this.get(key);
+  }
+  // 真的 Cache.addAll 自己会去抓 URL，并把相对路径按 sw.js 的位置解析成绝对键。
+  // 少了这个方法，install 一调就抛 TypeError，B 段整段跑不到——而 A 段的 FAIL 看起来
+  // 像是「预缓存清单是空的」，实际是台架自己缺了一条标准 API。
+  async addAll(reqs) {
+    for (const spec of reqs) {
+      const url = new URL(spec, sandbox.location.href).href;
+      await this.put(url, await sandbox.fetch(url));
+    }
+  }
 }
 const buckets = new Map();
 const caches = {
@@ -108,7 +121,7 @@ const caches = {
   async keys() { return [...buckets.keys()]; },
   async delete(name) { return buckets.delete(name); },
   async match(req) {
-    const key = typeof req === 'string' ? req : req.url;
+    const key = typeof req === 'string' ? new URL(req, sandbox.location.href).href : req.url;
     for (const b of buckets.values()) if (b.has(key)) return b.get(key);
     return undefined;
   },

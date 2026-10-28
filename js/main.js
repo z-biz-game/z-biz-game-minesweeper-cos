@@ -54,7 +54,6 @@ const ui = {
   resumeName: $('#resume-name'),
   resumeTier: $('#resume-tier'),
   btnPause: $('#btn-pause'),
-  btnSound: $('#btn-sound'),
   btnFull: $('#btn-fullscreen'),
 };
 
@@ -588,8 +587,6 @@ window.addEventListener('keydown', (ev) => {
   else if (k === 'y') game.redo();
   else if (k === 'h') useHint();
   else if (k === 'p') { ev.preventDefault(); togglePause(); }
-  // 静音与全屏不参与"这一格挖不挖"，所以暂停时也照样能按。
-  else if (k === 'm') toggleSound();
   else if (k === 'r') { ev.preventDefault(); $('#btn-restart').click(); }
   else if (k === 'escape') {
     show('menu');
@@ -597,26 +594,12 @@ window.addEventListener('keydown', (ev) => {
   }
 });
 
-// 静音：开关只有一处真值（Store.settings.sound），HUD 按钮与设置页复选框都走这里，
-// 否则会各存一份状态、点一下又互相打架。audio.setEnabled 里做的是挂起上下文。
+// 静音：开关只有一处真值（Store.settings.sound），HUD 按钮、M 键与设置页复选框都走
+// applySound，否则会各存一份状态、点一下又互相打架。audio.setEnabled 里做的是挂起上下文。
 function setSound(v) {
-  const on = !!v;
-  Store.setSetting('sound', on);
-  audio.setEnabled(on);
-  syncSoundUi();
+  const on = applySound(v);
   if (on) audio.hint();
   return on;
-}
-
-function syncSoundUi() {
-  const on = !audio.muted;
-  if (ui.btnSound) {
-    ui.btnSound.textContent = on ? '音效' : '静音';
-    ui.btnSound.setAttribute('aria-pressed', on ? 'false' : 'true');
-    ui.btnSound.classList.toggle('is-off', audio.muted);
-  }
-  const opt = $('#opt-sound');
-  if (opt) opt.checked = on;
 }
 
 // M / 按钮 / 设置页复选框三个入口，一个动作：翻转后把真值写回 Store。
@@ -794,7 +777,6 @@ $('#opt-motion').addEventListener('change', (e) => {
   setReduceMotion(e.target.checked);
 });
 $('#btn-pause').addEventListener('click', togglePause);
-$('#btn-sound').addEventListener('click', toggleSound);
 $('#btn-fullscreen').addEventListener('click', toggleFullscreen);
 $('#btn-help').addEventListener('click', () => ($('#help-sheet').hidden = false));
 $('#btn-help-close').addEventListener('click', () => ($('#help-sheet').hidden = true));

@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta name="color-scheme" content="dark light">
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><meta name="twitter:card" content="summary">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#0F0F0F">
-<meta name="description" content="扫雷 MINESWEEPER —— 每一局都保证可以用纯逻辑推到底，永不靠猜。生成器实测零猜测，难度分由求解器量出。"><meta property="og:title" content="扫雷 · Minesweeper"><meta property="og:description" content="扫雷 MINESWEEPER —— 每一局都保证可以用纯逻辑推到底，永不靠猜。生成器实测零猜测，难度分由求解器量出。"><meta property="og:image" content="https://z-biz-game.github.io/z-biz-game-minesweeper-cos/icons/icon-512.png"><meta name="twitter:image" content="https://z-biz-game.github.io/z-biz-game-minesweeper-cos/icons/icon-512.png">
+<meta name="description" content="扫雷 MINESWEEPER —— 每一局都保证可以用纯逻辑推到底，永不靠猜。生成器实测零猜测，难度分由求解器量出。">
 <title>扫雷 · Minesweeper</title>
 <link rel="icon" type="image/png" sizes="32x32" href="./assets/icons/favicon-32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/favicon-192.png">
+<link rel="icon" type="image/png" sizes="16x16" href="./assets/icons/favicon-16.png">
 <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon-180.png">
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
@@ -25,14 +24,10 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="暗色探雷面板：3×3 地砖，中央挖开露出琥珀底板上的雷，旁边翻开的格子说出 1 和 2">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://z-biz-game.github.io/z-biz-game-minesweeper-cos/assets/img/og-cover.png">
 <meta name="application-name" content="扫雷">
 <link rel="stylesheet" href="./css/game.css">
-
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/studio.css" />
+<link rel="stylesheet" href="./css/studio.css">
 </head>
 <body>
 <div id="app">
@@ -105,8 +100,6 @@
       </div>
       <div class="hud-actions">
         <button class="btn btn-ghost btn-sm" id="btn-pause" aria-pressed="false">暂停</button>
-        <button class="btn btn-ghost btn-sm" id="btn-sound" aria-pressed="true">音效</button>
-        <button class="btn btn-ghost btn-sm" id="btn-fullscreen" aria-label="全屏">全屏</button>
       </div>
     </header>
 
@@ -181,7 +174,6 @@
 
 <script src="./js/sw-register.js"></script>
 <script type="module" src="./js/main.js"></script>
-  <script src="js/sw-register.js"></script>
   <div class="studio-atmosphere" aria-hidden="true"></div>
 </body>
 </html>
