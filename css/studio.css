@@ -1,15 +1,16 @@
-/* z-biz-game studio polish layer v2 -- additive, specificity-0, never overrides game CSS.
-   Per-repo tint derived from each game's own palette (--studio-tint-rgb) so the shared
-   atmosphere reads as bespoke. Dark-first, glass tokens, cohesive focus/selection/scrollbar. */
+/* z-biz-game studio polish layer v3 -- additive, specificity-0, never overrides game CSS.
+   Adaptive: reads each game's OWN accent/theme, tints the void with its hue so the
+   shared atmosphere reads bespoke. Light/dark aware. Glass tokens, focus, tabular-nums. */
 :root{
-  --studio-tint-rgb:121,211,105;
-  --studio-bg-0:#0b0c16; --studio-bg-1:#121630; --studio-bg-2:#1c2244;
+  --studio-tint-rgb:203,210,201;
+  --studio-tint2-rgb:203,207,203;
+  --studio-bg-0:#1c1e22; --studio-bg-1:#2c2f36; --studio-bg-2:#3c404b;
   --studio-surface:rgba(255,255,255,.05);
   --studio-surface-2:rgba(255,255,255,.09);
   --studio-surface-brd:rgba(255,255,255,.12);
   --studio-ink:#f4f5fc; --studio-ink-dim:rgba(244,245,252,.64);
   --studio-accent:rgb(var(--studio-tint-rgb));
-  --studio-accent-2:#6ea8ff;
+  --studio-accent-2:rgb(var(--studio-tint2-rgb));
   --studio-ok:#3ecf8e; --studio-bad:#ff6b6b; --studio-warn:#ffce5a; --studio-info:#74b9ff;
   --studio-ring:rgb(var(--studio-tint-rgb));
   --studio-r-card:20px; --studio-r-btn:13px; --studio-r-tag:9px;
@@ -22,16 +23,16 @@
 /* atmosphere: fixed behind everything, never catches pointer events */
 .studio-atmosphere{position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(132% 92% at 50% -20%, rgba(var(--studio-tint-rgb),.20), transparent 56%),
-    radial-gradient(96% 78% at 86% 118%, rgba(var(--studio-tint-rgb),.12), transparent 55%),
+    radial-gradient(132% 92% at 50% -20%, rgba(var(--studio-tint-rgb),.18), transparent 56%),
+    radial-gradient(96% 78% at 86% 118%, rgba(var(--studio-tint2-rgb),.12), transparent 55%),
     radial-gradient(70% 60% at 10% 6%, rgba(255,255,255,.05), transparent 60%),
     linear-gradient(180deg,var(--studio-bg-1),var(--studio-bg-0) 72%);}
 .studio-atmosphere::before{content:"";position:absolute;inset:0;
-  background:radial-gradient(80% 52% at 50% -12%, rgba(255,255,255,.06), transparent 62%);
+  background:radial-gradient(130% 122% at 50% 44%, transparent 54%, rgba(0,0,0,.30) 100%);
   mix-blend-mode:screen;}
-.studio-atmosphere::after{content:"";position:absolute;inset:0;opacity:.04;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
-  background-size:160px 160px;}
+.studio-atmosphere::after{content:"";position:absolute;inset:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+  background-size:180px 180px;}
 html{color-scheme:dark light;-webkit-text-size-adjust:100%;}
 body{font-family:var(--studio-font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;line-height:1.5;}
 *{box-sizing:border-box;}
@@ -40,7 +41,7 @@ body{font-family:var(--studio-font);-webkit-font-smoothing:antialiased;text-rend
   border:1px solid var(--studio-surface-brd);
   background:linear-gradient(180deg,var(--studio-surface-2),var(--studio-surface));
   transition:transform .16s var(--studio-ease),box-shadow .16s var(--studio-ease),background .16s var(--studio-ease),border-color .16s var(--studio-ease);}
-:where(button,[role=button],.btn):hover{box-shadow:var(--studio-shadow-sm);border-color:rgba(255,255,255,.2);}
+:where(button,[role=button],.btn):hover{box-shadow:var(--studio-shadow-sm);border-color:rgba(255,255,255,.20);}
 :where(button,[role=button],.btn):active{transform:translateY(1px) scale(.985);}
 :where(button,[role=button],.btn):focus-visible,
 :where(a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible){
