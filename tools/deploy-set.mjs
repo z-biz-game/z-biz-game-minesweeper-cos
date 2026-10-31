@@ -251,7 +251,9 @@ for (let k = 0; k < refs.length; k += 1) {
     continue;
   }
   if (r.endsWith('.css')) {
-    for (const m of stripComments(text, true).matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
+    // 内联的 data: URI 自带引号，按 url() 切会把它们劈成几截，留下 css/%23n 这种假产物路径。
+    const css = text.replace(/url\(\s*(['"])data:[\s\S]*?\1\s*\)/gi, 'url(data:masked)');
+    for (const m of stripComments(css, true).matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
       push(r, m[1], dirOf(r));
     }
     continue;
