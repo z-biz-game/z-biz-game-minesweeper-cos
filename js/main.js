@@ -628,7 +628,9 @@ function setPaused(v) {
   needsDraw = true;
   return on;
 }
-const togglePause = () => setPaused(!game.paused());
+// setPaused 里有 !game 护栏，但实参在进函数之前就要取值；
+// 菜单页点到暂停入口时，会先在这里炸掉而不是被护栏接住。
+const togglePause = () => (game ? setPaused(!game.paused()) : false);
 
 // 全屏：绑在 #app 上（这个 id 在 index.html 里真实存在），并且承认"浏览器可以拒绝"。
 function toggleFullscreen() {
